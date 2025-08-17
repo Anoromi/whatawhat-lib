@@ -41,7 +41,7 @@ pub struct ActiveWindowData {
 }
 
 /// Intended to serve as a contract windows and linux systems must implement.
-#[cfg_attr(test, mockall::automock)]
+#[cfg_attr(feature = "mock", mockall::automock)]
 #[async_trait]
 pub trait WindowManager {
     async fn get_active_window_data(&mut self) -> Result<ActiveWindowData>;

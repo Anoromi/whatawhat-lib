@@ -31,6 +31,7 @@ wayland-protocols-wlr = { version = "0.3.9", features = [
 	"client",
 ], optional = true }
 chrono = "0.4.41"
+mockall = { version = "0.13.1", optional = true }
 
 [dependencies.xcb]
 version = "^1.6"
@@ -62,7 +63,7 @@ wayland = [
 	"dep:wayland-protocols-wlr",
 ]
 kde = ["wayland", "dep:zbus"]
+mock = ["dep:mockall"]
 
 [dev-dependencies]
-mockall = "0.13.1"
 tokio = { version = "1.47.1", features = ["full"] }
