@@ -2,6 +2,11 @@
 name = "whatawhat-lib"
 version = "0.1.0"
 edition = "2024"
+description = "A collection of utils for windows and linux for collecting activity data"
+authors = ["Andrii Zahorulko", "Demmie <2e3s19@gmail.com>"]
+license = "MPL-2.0"
+repository = "https://github.com/Anoromi/whatawhat-lib"
+
 
 [dependencies]
 anyhow = { version = "1.0.98", features = ["backtrace"] }
