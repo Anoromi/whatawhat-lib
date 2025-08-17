@@ -36,7 +36,7 @@ impl KWinScript {
 
     async fn load(&mut self) -> anyhow::Result<()> {
         let path = temp_dir().join("whatawhat-lib.js");
-        std::fs::write(&path, KWIN_SCRIPT).unwrap();
+        std::fs::write(&path, KWIN_SCRIPT).with_context(|| "Failed to create kwin script")?;
 
         let number = self.get_registered_number(&path).await?;
         let result = self.start(number).await;

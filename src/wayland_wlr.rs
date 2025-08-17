@@ -219,7 +219,7 @@ impl WaylandWindowWatcher {
 
 impl Drop for WaylandWindowWatcher {
     fn drop(&mut self) {
-        self.stop_signal.send(()).unwrap();
+        let _ = self.stop_signal.send(());
     }
 }
 
