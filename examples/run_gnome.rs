@@ -15,7 +15,7 @@ async fn main() {
     tracing_subscriber::fmt()
         // all spans/events with a level higher than TRACE (e.g, info, warn, etc.)
         // will be written to stdout.
-        .with_max_level(Level::TRACE)
+        .with_max_level(Level::DEBUG)
         // sets this to be the default, global subscriber for this application.
         .init();
 
@@ -27,6 +27,7 @@ async fn main() {
         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
     }
 }
+
 #[cfg(not(feature = "gnome"))]
 fn main() {
     println!("Not supported");

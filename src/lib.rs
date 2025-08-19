@@ -15,6 +15,8 @@ pub mod x11;
 
 pub mod idle;
 pub mod utils;
+pub mod linux_desktop;
+pub mod simple_cache;
 
 #[cfg(feature = "win")]
 extern crate windows;
@@ -37,7 +39,9 @@ pub struct ActiveWindowData {
     /// On windows it is a process name. For example `C:\Windows\System32\cmd.exe`
     /// On x11 it is a process name. For example `/home/etc/nvim``
     /// On wayland, gnome, and kde it's a resource class. For example `org.kde.kate`
-    pub app_identifier: Arc<str>,
+    pub process_path: Option<Arc<str>>,
+    pub app_identifier: Option<Arc<str>>,
+    pub app_name: Option<Arc<str>>,
 }
 
 /// Intended to serve as a contract windows and linux systems must implement.

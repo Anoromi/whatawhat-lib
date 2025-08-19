@@ -166,8 +166,10 @@ impl WaylandWindowWatcherInner {
             ))?;
 
         Ok(ActiveWindowData {
-            app_identifier: active_window.app_id.clone().into(),
+            app_identifier: Some(active_window.app_id.clone().into()),
+            process_path: todo!(),
             window_title: active_window.title.clone().into(),
+            app_name: todo!(),
         })
     }
 }

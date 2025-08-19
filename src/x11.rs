@@ -116,9 +116,14 @@ impl WindowData {
             .ok_or_else(|| anyhow!("Failed to get pid: pid is None"))?;
         let process_name = get_process_name(process)?
             .ok_or_else(|| anyhow!("Failed to get process name: process name is None"))?;
+
+
+
         Ok(ActiveWindowData {
             window_title: window_name.into(),
-            app_identifier: process_name.into(),
+            process_path: Some(process_name.into()),
+            app_identifier: None,
+            app_name: todo!(),
         })
     }
 }

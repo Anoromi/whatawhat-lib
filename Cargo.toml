@@ -32,6 +32,9 @@ wayland-protocols-wlr = { version = "0.3.9", features = [
 ], optional = true }
 chrono = "0.4.41"
 mockall = { version = "0.13.1", optional = true }
+freedesktop-desktop-entry = "0.7.14"
+systemicons = "0.9.13"
+gio = "0.21.1"
 
 [dependencies.xcb]
 version = "^1.6"

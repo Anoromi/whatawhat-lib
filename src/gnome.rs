@@ -8,6 +8,8 @@ use zbus::Connection;
 
 use crate::{
     ActiveWindowData, WindowManager,
+    linux_desktop::{DesktopInfo, LinuxDesktopInfo},
+    simple_cache::{CacheConfig, SimpleCache},
     utils::{is_gnome, is_x11},
 };
 
@@ -15,7 +17,11 @@ pub struct GnomeWindowWatcher {
     dbus_connection: Connection,
     last_title: String,
     last_app_id: String,
+    app_name: String,
+    process_path: String,
     idle_timeout: Duration,
+    desktop_info_cache: SimpleCache<String, DesktopInfo>,
+    linux_desktop_info: LinuxDesktopInfo,
 }
 
 #[derive(Deserialize, Default)]
@@ -86,6 +92,13 @@ impl GnomeWindowWatcher {
                 last_app_id: String::new(),
                 last_title: String::new(),
                 idle_timeout,
+                app_name: String::new(),
+                process_path: String::new(),
+                desktop_info_cache: SimpleCache::new(CacheConfig {
+                    ttl: Duration::from_secs(60),
+                    max_size: 1000,
+                }),
+                linux_desktop_info: LinuxDesktopInfo::new(),
             };
             watcher.get_window_data().await?;
             Ok(watcher)
@@ -135,9 +148,25 @@ impl WindowManager for GnomeWindowWatcher {
             self.last_title = data.title;
         }
 
+        let (process_path, app_name) = match self.desktop_info_cache.get(&self.last_app_id) {
+            Some(extra_info) => (Some(extra_info.process_path), Some(extra_info.app_name)),
+            None => {
+                if let Some(extra_info) = self.linux_desktop_info.get_extra_info(&self.last_app_id)
+                {
+                    self.desktop_info_cache
+                        .set(self.last_app_id.clone(), extra_info.clone());
+                    (Some(extra_info.process_path), Some(extra_info.app_name))
+                } else {
+                    (None, None)
+                }
+            }
+        };
+
         Ok(ActiveWindowData {
             window_title: self.last_title.clone().into(),
-            app_identifier: self.last_app_id.clone().into(),
+            app_identifier: Some(self.last_app_id.clone().into()),
+            process_path,
+            app_name,
         })
     }
 

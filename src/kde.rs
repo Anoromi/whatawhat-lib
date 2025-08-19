@@ -4,6 +4,8 @@
  * Inspired by https://github.com/k0kubun/xremap/
  */
 use crate::idle::Status;
+use crate::linux_desktop::{DesktopInfo, LinuxDesktopInfo};
+use crate::simple_cache::{CacheConfig, SimpleCache};
 use crate::wayland_idle::IdleWatcherRunner;
 use crate::{ActiveWindowData, WindowManager};
 use anyhow::{Context, Result, anyhow};
@@ -198,18 +200,24 @@ async fn send_active_window(
 
     Ok(ActiveWindowData {
         window_title: active_window.caption.clone().into(),
-        app_identifier: active_window.resource_name.clone().into(),
+        app_identifier: Some(active_window.resource_name.clone().into()),
+        process_path: active_window.process_path.clone(),
+        app_name: active_window.app_name.clone(),
     })
 }
 
 struct ActiveWindow {
-    resource_class: String,
-    resource_name: String,
-    caption: String,
+    resource_class: Arc<str>,
+    resource_name: Arc<str>,
+    caption: Arc<str>,
+    process_path: Option<Arc<str>>,
+    app_name: Option<Arc<str>>,
 }
 
 struct ActiveWindowInterface {
     active_window: Arc<Mutex<ActiveWindow>>,
+    desktop_info_cache: SimpleCache<String, DesktopInfo>,
+    linux_desktop_info: LinuxDesktopInfo,
 }
 
 #[interface(name = "com.github.anoromi.whatawhat_lib")]
@@ -224,10 +232,27 @@ impl ActiveWindowInterface {
         debug!(
             "Active window class: \"{resource_class}\", name: \"{resource_name}\", caption: \"{caption}\""
         );
+
+        let (process_path, app_name) = match self.desktop_info_cache.get(&resource_name) {
+            Some(extra_info) => (Some(extra_info.process_path), Some(extra_info.app_name)),
+            None => {
+                if let Some(extra_info) = self.linux_desktop_info.get_extra_info(&resource_name) {
+                    self.desktop_info_cache
+                        .set(resource_name.clone(), extra_info.clone());
+                    (Some(extra_info.process_path), Some(extra_info.app_name))
+                } else {
+                    (None, None)
+                }
+            }
+        };
+
         let mut active_window = self.active_window.lock().await;
-        active_window.caption = caption;
-        active_window.resource_class = resource_class;
-        active_window.resource_name = resource_name;
+        active_window.caption = caption.into();
+        active_window.resource_class = resource_class.into();
+        active_window.resource_name = resource_name.into();
+
+        active_window.process_path = process_path;
+        active_window.app_name = app_name;
     }
 }
 
@@ -254,12 +279,19 @@ impl KdeWindowManager {
         kwin_script.load().await.unwrap();
 
         let active_window = Arc::new(Mutex::new(ActiveWindow {
-            caption: String::new(),
-            resource_name: String::new(),
-            resource_class: String::new(),
+            caption: "".into(),
+            resource_name: "".into(),
+            resource_class: "".into(),
+            process_path: None,
+            app_name: None,
         }));
         let active_window_interface = ActiveWindowInterface {
             active_window: Arc::clone(&active_window),
+            desktop_info_cache: SimpleCache::new(CacheConfig {
+                ttl: Duration::from_secs(60 * 60 * 24),
+                max_size: 1000,
+            }),
+            linux_desktop_info: LinuxDesktopInfo::new(),
         };
 
         let (tx, rx) = channel();
