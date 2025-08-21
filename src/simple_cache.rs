@@ -4,18 +4,20 @@ use std::{
     time::{Duration, SystemTime},
 };
 
+#[derive(Debug)]
 pub struct SimpleCache<G, T> {
     cache: HashMap<G, CacheEntry<T>>,
     config: CacheConfig,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct CacheConfig {
     pub ttl: Duration,
     pub max_size: usize,
 }
 
 #[derive(Clone)]
+#[derive(Debug)]
 struct CacheEntry<T> {
     data: T,
     timestamp: SystemTime,

@@ -32,9 +32,10 @@ wayland-protocols-wlr = { version = "0.3.9", features = [
 ], optional = true }
 chrono = "0.4.41"
 mockall = { version = "0.13.1", optional = true }
-freedesktop-desktop-entry = "0.7.14"
-systemicons = "0.9.13"
-gio = "0.21.1"
+freedesktop-desktop-entry = { version = "0.7.14", optional = true }
+systemicons = { version = "0.9.13", optional = true }
+gio = { version = "0.21.1", optional = true }
+pelite = "0.10.0"
 
 [dependencies.xcb]
 version = "^1.6"
@@ -57,16 +58,28 @@ optional = true
 
 [features]
 win = ["dep:windows"]
-x11 = ["dep:xcb"]
-gnome = ["dep:zbus"]
+x11 = ["dep:xcb", "dep:freedesktop-desktop-entry", "dep:gio", "dep:systemicons"]
+gnome = ["dep:zbus", "dep:freedesktop-desktop-entry", "dep:gio"]
 wayland = [
 	"dep:wayland-client",
 	"dep:wayland-protocols",
 	"dep:wayland-protocols-plasma",
 	"dep:wayland-protocols-wlr",
+	"dep:freedesktop-desktop-entry",
+	"dep:gio",
+	"dep:systemicons",
 ]
-kde = ["wayland", "dep:zbus"]
+kde = [
+	"wayland",
+	"dep:zbus",
+	"dep:freedesktop-desktop-entry",
+	"dep:gio",
+	"dep:systemicons",
+]
 mock = ["dep:mockall"]
 
 [dev-dependencies]
 tokio = { version = "1.47.1", features = ["full"] }
+
+[profile.release]
+debug = true

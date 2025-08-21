@@ -17,9 +17,9 @@ async fn main() {
         .init();
 
     loop {
-        let active_window = window_manager.get_active_window_data().await.unwrap();
+        let active_window = window_manager.get_active_window_data().await;
         println!("Active window: {:?}", active_window);
-        let idle_time = window_manager.is_idle().await.unwrap();
+        let idle_time = window_manager.is_idle().await;
         println!("Idle time: {:?}", idle_time);
         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
     }

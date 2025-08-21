@@ -8,6 +8,8 @@ pub mod wayland_idle;
 pub mod wayland_wlr;
 #[cfg(feature = "win")]
 pub mod win;
+#[cfg(feature = "win")]
+pub mod windows_desktop;
 #[cfg(feature = "wayland")]
 pub mod wl_connection;
 #[cfg(feature = "x11")]
@@ -15,6 +17,7 @@ pub mod x11;
 
 pub mod idle;
 pub mod utils;
+#[cfg(any(feature = "x11", feature = "wayland", feature = "gnome", feature = "kde"))]
 pub mod linux_desktop;
 pub mod simple_cache;
 
@@ -28,7 +31,10 @@ use std::{sync::Arc, time::Duration};
 
 use anyhow::Result;
 use async_trait::async_trait;
+#[cfg(any(feature = "x11", feature = "wayland", feature = "gnome", feature = "kde"))]
 use tracing::info;
+
+use crate::simple_cache::CacheConfig;
 
 #[derive(Debug, Clone)]
 pub struct ActiveWindowData {
@@ -60,12 +66,12 @@ pub struct GenericWindowManager {
 }
 
 impl GenericWindowManager {
-    pub async fn new(idle_timeout: Duration) -> Result<Self> {
+    pub async fn new(idle_timeout: Duration, cache_config: Option<CacheConfig>) -> Result<Self> {
         #[cfg(feature = "win")]
         {
             use win::WindowsWindowManager;
             return Ok(Self {
-                inner: Box::new(WindowsWindowManager::new(idle_timeout)),
+                inner: Box::new(WindowsWindowManager::new(idle_timeout, cache_config)),
             });
         }
         // TODO: Should try to select not select outright
