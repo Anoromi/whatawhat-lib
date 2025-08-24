@@ -4,7 +4,6 @@
 use std::time::Duration;
 
 use anyhow::{Result, anyhow};
-use async_trait::async_trait;
 use sysinfo::Pid;
 use tracing::{error, instrument};
 use xcb::{
@@ -117,13 +116,11 @@ impl WindowData {
         let process_name = get_process_name(process)?
             .ok_or_else(|| anyhow!("Failed to get process name: process name is None"))?;
 
-
-
         Ok(ActiveWindowData {
             window_title: window_name.into(),
             process_path: Some(process_name.into()),
             app_identifier: None,
-            app_name: todo!(),
+            app_name: None,
         })
     }
 }
@@ -183,10 +180,9 @@ impl LinuxWindowManager {
     }
 }
 
-#[async_trait]
 impl WindowManager for LinuxWindowManager {
     #[instrument(skip(self))]
-    async fn get_active_window_data(&mut self) -> Result<ActiveWindowData> {
+    fn get_active_window_data(&mut self) -> Result<ActiveWindowData> {
         let data = self
             .try_get_data()
             .inspect_err(|e| error!("Failed getting connection {e:?}"))?;
@@ -196,7 +192,7 @@ impl WindowManager for LinuxWindowManager {
     }
 
     #[instrument(skip(self))]
-    async fn is_idle(&mut self) -> Result<bool> {
+    fn is_idle(&mut self) -> Result<bool> {
         let data = self
             .try_get_data()
             .inspect_err(|e| error!("Failed getting connection {e:?}"))?;

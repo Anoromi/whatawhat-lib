@@ -3,9 +3,12 @@
 
 use std::time::Duration;
 
+use crate::{
+    simple_cache::CacheConfig,
+    utils::default_cache_config,
+    windows_desktop::{WindowsAppInfo, WindowsDesktopInfo},
+};
 use anyhow::{Result, anyhow};
-use async_trait::async_trait;
-use crate::{simple_cache::CacheConfig, utils::default_cache_config, windows_desktop::{WindowsAppInfo, WindowsDesktopInfo}};
 use tracing::error;
 use windows::{
     Win32::{
@@ -68,7 +71,7 @@ impl WindowsWindowManager {
 }
 
 #[tracing::instrument]
-async fn get_active_windows_data(
+fn get_active_windows_data(
     desktop_info_cache: &mut crate::simple_cache::SimpleCache<String, WindowsAppInfo>,
     windows_desktop_info: &WindowsDesktopInfo,
 ) -> Result<ActiveWindowData> {
@@ -158,15 +161,13 @@ pub fn get_idle_time() -> Result<u64> {
     }
 }
 
-#[async_trait]
 impl WindowManager for WindowsWindowManager {
-    async fn get_active_window_data(&mut self) -> Result<ActiveWindowData> {
+    fn get_active_window_data(&mut self) -> Result<ActiveWindowData> {
         get_active_windows_data(&mut self.desktop_info_cache, &self.windows_desktop_info)
-            .await
             .inspect_err(|e| error!("Failed to get active window {e:?}"))
     }
 
-    async fn is_idle(&mut self) -> Result<bool> {
+    fn is_idle(&mut self) -> Result<bool> {
         let idle_time = get_idle_time().inspect_err(|e| error!("Failed to get idle time {e:?}"))?;
         Ok(idle_time > self.idle_timeout.as_millis() as u64)
     }

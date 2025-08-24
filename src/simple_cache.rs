@@ -16,8 +16,7 @@ pub struct CacheConfig {
     pub max_size: usize,
 }
 
-#[derive(Clone)]
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct CacheEntry<T> {
     data: T,
     timestamp: SystemTime,

@@ -1,9 +1,7 @@
 use std::sync::Arc;
 
-use freedesktop_desktop_entry::{unicase::Ascii, DesktopEntry};
+use freedesktop_desktop_entry::{DesktopEntry, unicase::Ascii};
 use tracing::warn;
-
-
 
 pub struct LinuxDesktopInfo {
     entries: Vec<DesktopEntry>,

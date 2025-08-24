@@ -1,10 +1,9 @@
 use std::time::Duration;
 
 use anyhow::{Context, Result, anyhow};
-use async_trait::async_trait;
 use serde::Deserialize;
 use tracing::{debug, trace};
-use zbus::Connection;
+use zbus::blocking::Connection;
 
 use crate::{
     ActiveWindowData, WindowManager,
@@ -31,17 +30,14 @@ struct WindowData {
 }
 
 impl GnomeWindowWatcher {
-    async fn get_window_data(&self) -> anyhow::Result<WindowData> {
-        let call_response = self
-            .dbus_connection
-            .call_method(
-                Some("org.gnome.Shell"),
-                "/org/gnome/shell/extensions/FocusedWindow",
-                Some("org.gnome.shell.extensions.FocusedWindow"),
-                "Get",
-                &(),
-            )
-            .await;
+    fn get_window_data(&self) -> anyhow::Result<WindowData> {
+        let call_response = self.dbus_connection.call_method(
+            Some("org.gnome.Shell"),
+            "/org/gnome/shell/extensions/FocusedWindow",
+            Some("org.gnome.shell.extensions.FocusedWindow"),
+            "Get",
+            &(),
+        );
 
         match call_response {
             Ok(json) => {
@@ -64,17 +60,14 @@ impl GnomeWindowWatcher {
         }
     }
 
-    async fn get_idle_time_data(&self) -> Result<u64> {
-        let call_response = self
-            .dbus_connection
-            .call_method(
-                Some("org.gnome.Shell"),
-                "/org/gnome/Mutter/IdleMonitor/Core",
-                Some("org.gnome.Mutter.IdleMonitor"),
-                "GetIdletime",
-                &(),
-            )
-            .await;
+    fn get_idle_time_data(&self) -> Result<u64> {
+        let call_response = self.dbus_connection.call_method(
+            Some("org.gnome.Shell"),
+            "/org/gnome/Mutter/IdleMonitor/Core",
+            Some("org.gnome.Mutter.IdleMonitor"),
+            "GetIdletime",
+            &(),
+        );
         let result = call_response
             .with_context(|| "Failed to get idle time")?
             .body()
@@ -85,10 +78,10 @@ impl GnomeWindowWatcher {
 }
 
 impl GnomeWindowWatcher {
-    pub async fn new(idle_timeout: Duration) -> Result<Self> {
-        let loader = async || -> Result<Self> {
+    pub fn new(idle_timeout: Duration) -> Result<Self> {
+        let loader = || -> Result<Self> {
             let watcher = Self {
-                dbus_connection: Connection::session().await?,
+                dbus_connection: Connection::session()?,
                 last_app_id: String::new(),
                 last_title: String::new(),
                 idle_timeout,
@@ -100,7 +93,7 @@ impl GnomeWindowWatcher {
                 }),
                 linux_desktop_info: LinuxDesktopInfo::new(),
             };
-            watcher.get_window_data().await?;
+            watcher.get_window_data()?;
             Ok(watcher)
         };
 
@@ -116,7 +109,7 @@ impl GnomeWindowWatcher {
 
         let mut watcher = Err(anyhow::anyhow!(""));
         for _ in 0..3 {
-            watcher = loader().await;
+            watcher = loader();
             if let Err(e) = &watcher {
                 debug!("Failed to load Gnome Wayland watcher: {e}");
                 std::thread::sleep(std::time::Duration::from_secs(3));
@@ -126,10 +119,9 @@ impl GnomeWindowWatcher {
     }
 }
 
-#[async_trait]
 impl WindowManager for GnomeWindowWatcher {
-    async fn get_active_window_data(&mut self) -> Result<ActiveWindowData> {
-        let data = self.get_window_data().await;
+    fn get_active_window_data(&mut self) -> Result<ActiveWindowData> {
+        let data = self.get_window_data();
         if let Err(e) = data {
             if e.to_string().contains("Object does not exist at path") {
                 trace!("The extension seems to have stopped");
@@ -170,8 +162,8 @@ impl WindowManager for GnomeWindowWatcher {
         })
     }
 
-    async fn is_idle(&mut self) -> Result<bool> {
-        let data = self.get_idle_time_data().await?;
+    fn is_idle(&mut self) -> Result<bool> {
+        let data = self.get_idle_time_data()?;
         Ok(data > self.idle_timeout.as_millis() as u64)
     }
 }

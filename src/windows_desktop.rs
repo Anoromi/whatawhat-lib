@@ -20,7 +20,10 @@ impl WindowsDesktopInfo {
         let file_map = match pelite::FileMap::open(&path) {
             Ok(map) => map,
             Err(e) => {
-                warn!("Failed to map file for version info: {}: {}", process_path, e);
+                warn!(
+                    "Failed to map file for version info: {}: {}",
+                    process_path, e
+                );
                 return None;
             }
         };
@@ -59,5 +62,3 @@ impl WindowsDesktopInfo {
         product_name.map(|app_name| WindowsAppInfo { app_name })
     }
 }
-
-

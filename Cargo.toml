@@ -10,13 +10,12 @@ repository = "https://github.com/Anoromi/whatawhat-lib"
 
 [dependencies]
 anyhow = { version = "1.0.98", features = ["backtrace"] }
-async-trait = "0.1.88"
 cfg-if = "1.0.0"
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.142"
 sysinfo = "0.36.1"
 tracing = "0.1.41"
-zbus = { version = "5.9.0", optional = true }
+zbus = { version = "5.9.0", features = ["blocking"], optional = true }
 tokio = { version = "1", features = ["sync", "rt"] }
 tracing-subscriber = "0.3.19"
 wayland-client = { version = "0.31.11", optional = true }
@@ -37,6 +36,18 @@ systemicons = { version = "0.9.13", optional = true }
 gio = { version = "0.21.1", optional = true }
 pelite = "0.10.0"
 
+objc2 = { version = "=0.6.2", optional = true }
+objc2-foundation = { version = "=0.3.1", optional = true, features = [
+	"NSDictionary",
+	"NSString",
+	"NSAppleScript",
+	"NSURL",
+] }
+objc2-osa-kit = { version = "=0.3.1", optional = true }
+objc2-core-graphics = { version = "0.3.1", optional = true }
+clap = { version = "4.5.45", features = ["derive"] }
+
+
 [dependencies.xcb]
 version = "^1.6"
 features = ["screensaver"]
@@ -55,6 +66,7 @@ features = [
 	"Win32_System_SystemServices",
 ]
 optional = true
+
 
 [features]
 win = ["dep:windows"]
@@ -77,6 +89,8 @@ kde = [
 	"dep:systemicons",
 ]
 mock = ["dep:mockall"]
+macos = ["dep:objc2-foundation", "dep:objc2", "dep:objc2-osa-kit", "dep:objc2-core-graphics"]
+
 
 [dev-dependencies]
 tokio = { version = "1.47.1", features = ["full"] }

@@ -1,19 +1,18 @@
 use crate::ActiveWindowData;
 use crate::WindowManager;
 use crate::idle::Status;
+use crate::linux_desktop::DesktopInfo;
+use crate::linux_desktop::LinuxDesktopInfo;
+use crate::simple_cache::CacheConfig;
+use crate::simple_cache::SimpleCache;
+use crate::utils::default_cache_config;
 use crate::wayland_idle::IdleWatcherRunner;
 
 use super::wl_connection::WlEventConnection;
 use super::wl_connection::subscribe_state;
 use anyhow::anyhow;
-use async_trait::async_trait;
 use std::collections::HashMap;
-use std::sync::Arc;
-use std::sync::mpsc;
-use std::thread;
-use std::thread::JoinHandle;
 use std::time::Duration;
-use tokio::sync::Mutex;
 use tracing::{debug, error, trace, warn};
 use wayland_client::{
     Connection, Dispatch, Proxy, QueueHandle, event_created_child, globals::GlobalListContents,
@@ -126,10 +125,12 @@ impl Dispatch<ZwlrForeignToplevelHandleV1, ()> for ToplevelState {
 pub struct WaylandWindowWatcherInner {
     connection: WlEventConnection<ToplevelState>,
     toplevel_state: ToplevelState,
+    desktop_info_cache: SimpleCache<String, DesktopInfo>,
+    linux_desktop_info: LinuxDesktopInfo,
 }
 
 impl WaylandWindowWatcherInner {
-    pub async fn new() -> anyhow::Result<Self> {
+    pub fn new(cache_config: CacheConfig) -> anyhow::Result<Self> {
         let mut connection: WlEventConnection<ToplevelState> = WlEventConnection::connect()?;
         connection.get_foreign_toplevel_manager()?;
 
@@ -143,6 +144,8 @@ impl WaylandWindowWatcherInner {
         Ok(Self {
             connection,
             toplevel_state,
+            desktop_info_cache: SimpleCache::new(cache_config),
+            linux_desktop_info: LinuxDesktopInfo::new(),
         })
     }
 
@@ -165,55 +168,42 @@ impl WaylandWindowWatcherInner {
                 "Current window is not found by ID {active_window_id}"
             ))?;
 
+        let (process_path, app_name) = match self.desktop_info_cache.get(&active_window.app_id) {
+            Some(extra_info) => (Some(extra_info.process_path), Some(extra_info.app_name)),
+            None => {
+                if let Some(extra_info) = self
+                    .linux_desktop_info
+                    .get_extra_info(&active_window.app_id)
+                {
+                    self.desktop_info_cache
+                        .set(active_window_id.clone(), extra_info.clone());
+                    (Some(extra_info.process_path), Some(extra_info.app_name))
+                } else {
+                    (None, None)
+                }
+            }
+        };
+
         Ok(ActiveWindowData {
             app_identifier: Some(active_window.app_id.clone().into()),
-            process_path: todo!(),
+            process_path: process_path,
             window_title: active_window.title.clone().into(),
-            app_name: todo!(),
+            app_name: app_name,
         })
     }
 }
 
 pub struct WaylandWindowWatcher {
-    pub stop_signal: mpsc::Sender<()>,
-    pub handle: JoinHandle<()>,
-    pub current_window_data: Arc<Mutex<Option<ActiveWindowData>>>,
+    inner: WaylandWindowWatcherInner,
     pub idle_watcher: IdleWatcherRunner,
 }
 
-const WINDOW_WATCHER_INTERVAL: Duration = Duration::from_secs(1);
-
 impl WaylandWindowWatcher {
-    pub async fn new(timeout: Duration) -> anyhow::Result<Self> {
-        let mut window_watcher = WaylandWindowWatcherInner::new().await?;
-        let (stop_signal, stop_signal_receiver) = mpsc::channel();
-        let current_window_data = Arc::new(Mutex::new(None));
-
-        let handle = {
-            let current_window_data = current_window_data.clone();
-            thread::spawn(move || {
-                loop {
-                    match window_watcher.run_iteration() {
-                        Ok(active_window_data) => {
-                            let mut current_window_data = current_window_data.blocking_lock();
-                            *current_window_data = Some(active_window_data);
-                        }
-                        Err(e) => {
-                            error!("Error running idle watcher: {}", e);
-                        }
-                    }
-
-                    thread::sleep(WINDOW_WATCHER_INTERVAL);
-                    if let Ok(_) = stop_signal_receiver.try_recv() {
-                        break;
-                    }
-                }
-            })
-        };
+    pub fn new(timeout: Duration, cache_config: Option<CacheConfig>) -> anyhow::Result<Self> {
+        let window_watcher =
+            WaylandWindowWatcherInner::new(cache_config.unwrap_or(default_cache_config()))?;
         Ok(Self {
-            stop_signal,
-            handle,
-            current_window_data,
+            inner: window_watcher,
             idle_watcher: IdleWatcherRunner::new(timeout.as_millis() as u32)?,
         })
     }
@@ -221,22 +211,17 @@ impl WaylandWindowWatcher {
 
 impl Drop for WaylandWindowWatcher {
     fn drop(&mut self) {
-        let _ = self.stop_signal.send(());
+        // No background thread to stop
     }
 }
 
-#[async_trait]
 impl WindowManager for WaylandWindowWatcher {
-    async fn get_active_window_data(&mut self) -> anyhow::Result<ActiveWindowData> {
-        let current_window_data = self.current_window_data.lock().await.clone();
-        match current_window_data {
-            Some(active_window_data) => Ok(active_window_data),
-            None => Err(anyhow!("No active window data")),
-        }
+    fn get_active_window_data(&mut self) -> anyhow::Result<ActiveWindowData> {
+        self.inner.run_iteration()
     }
 
-    async fn is_idle(&mut self) -> anyhow::Result<bool> {
-        let status_guard = self.idle_watcher.current_idle_status.lock().await;
+    fn is_idle(&mut self) -> anyhow::Result<bool> {
+        let status_guard = self.idle_watcher.current_idle_status.lock().unwrap();
         match *status_guard {
             Some(Status::Active { .. }) => Ok(false),
             Some(Status::Idle { .. }) => Ok(true),
