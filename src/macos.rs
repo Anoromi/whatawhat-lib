@@ -102,6 +102,6 @@ impl WindowManager for MacosManger {
                 any_event,
             )
         };
-        return Ok(last_input > self.idle_timeout.as_secs_f64());
+        Ok(last_input > self.idle_timeout.as_secs_f64())
     }
 }
