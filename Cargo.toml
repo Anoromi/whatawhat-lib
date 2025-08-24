@@ -11,7 +11,7 @@ repository = "https://github.com/Anoromi/whatawhat-lib"
 [dependencies]
 anyhow = { version = "1.0.98", features = ["backtrace"] }
 serde = { version = "1.0.219", features = ["derive"] }
-serde_json = "1.0.142"
+serde_json = "1"
 sysinfo = "0.36.1"
 tracing = "0.1.41"
 zbus = { version = "5.9.0", features = ["blocking"], optional = true }
@@ -29,8 +29,6 @@ wayland-protocols-wlr = { version = "0.3.9", features = [
 chrono = "0.4.41"
 mockall = { version = "0.13.1", optional = true }
 freedesktop-desktop-entry = { version = "0.7.14", optional = true }
-systemicons = { version = "0.9.13", optional = true }
-gio = { version = "0.21.1", optional = true }
 pelite = { version = "0.10.0", optional = true }
 
 objc2 = { version = "=0.6.2", optional = true }
@@ -66,23 +64,19 @@ optional = true
 
 [features]
 win = ["dep:windows", "dep:pelite"]
-x11 = ["dep:xcb", "dep:freedesktop-desktop-entry", "dep:gio", "dep:systemicons"]
-gnome = ["dep:zbus", "dep:freedesktop-desktop-entry", "dep:gio"]
+x11 = ["dep:xcb", "dep:freedesktop-desktop-entry"]
+gnome = ["dep:zbus", "dep:freedesktop-desktop-entry"]
 wayland = [
 	"dep:wayland-client",
 	"dep:wayland-protocols",
 	"dep:wayland-protocols-plasma",
 	"dep:wayland-protocols-wlr",
 	"dep:freedesktop-desktop-entry",
-	"dep:gio",
-	"dep:systemicons",
 ]
 kde = [
 	"wayland",
 	"dep:zbus",
 	"dep:freedesktop-desktop-entry",
-	"dep:gio",
-	"dep:systemicons",
 ]
 mock = ["dep:mockall"]
 macos = [
