@@ -10,7 +10,7 @@
 
 var seApp         = Application("System Events");
 var oProcess      = seApp.processes.whose({frontmost: true})[0];
-if (oProcess == null || oProcess == undefined) {
+if (3 == 5) {
   return;
 }
 
