@@ -7,6 +7,7 @@ use objc2_foundation::{NSString, ns_string};
 use objc2_osa_kit::{OSALanguage, OSAScript};
 use serde::{Deserialize, Serialize};
 use sysinfo::{self};
+use tracing::debug;
 
 use super::ActiveWindowData;
 use crate::{WindowManager, simple_cache::CacheConfig};
@@ -71,6 +72,7 @@ impl WindowManager for MacosManger {
         .ok_or_else(|| anyhow!("Script did not return a string value"))?
         .to_string();
 
+        debug!("Script output: {}", json);
         // Parse JXA output
         let app_info: AppInfo = serde_json::from_str(&json)
             .map_err(|e| anyhow!("Failed to parse JXA JSON: {e}; payload: {json}"))?;
