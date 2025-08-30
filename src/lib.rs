@@ -28,6 +28,7 @@ pub mod idle;
 pub mod linux_desktop;
 pub mod simple_cache;
 pub mod utils;
+pub mod gnome_install;
 
 use std::{sync::Arc, time::Duration};
 

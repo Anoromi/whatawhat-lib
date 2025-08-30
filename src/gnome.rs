@@ -33,8 +33,8 @@ impl GnomeWindowWatcher {
     fn get_window_data(&self) -> anyhow::Result<WindowData> {
         let call_response = self.dbus_connection.call_method(
             Some("org.gnome.Shell"),
-            "/org/gnome/shell/extensions/FocusedWindow",
-            Some("org.gnome.shell.extensions.FocusedWindow"),
+            "/org/gnome/shell/extensions/WhatawhatFocusedWindow",
+            Some("org.gnome.shell.extensions.WhatawhatFocusedWindow"),
             "Get",
             &(),
         );
