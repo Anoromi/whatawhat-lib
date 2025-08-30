@@ -10,14 +10,14 @@
 
 // null.hello();
 // console.log(Date.now())
-var seApp = Application("System Events")
-let selected
-for (let v of seApp.processes) {
-  if (v.frontmost()) {
-    selected = v;
-    break;
-  }
-}
+// var seApp = Application("System Events")
+// let selected
+// for (let v of seApp.processes) {
+//   if (v.frontmost()) {
+//     selected = v;
+//     break;
+//   }
+// }
 JSON.stringify({
   hello: Date.now().toString()
 })
