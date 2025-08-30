@@ -10,7 +10,8 @@
 
 var seApp = Application("System Events")
 var oProcess = seApp.processes.whose({ frontmost: true })
-console.log(oProcess)
+JSON.stringify(oProcess.length)
+// console.log(oProcess)
 // if (!oProcess) {
 //   JSON.stringify(null)
 // } else {
