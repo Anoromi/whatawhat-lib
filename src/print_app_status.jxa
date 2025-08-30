@@ -8,7 +8,8 @@
 // - interactive repl: `osascript -il JavaScript`
 // - API reference: Script Editor -> File -> Open Dictionary
 
-console.log(Date.now())
+null.hello();
+// console.log(Date.now())
 // var seApp = Application("System Events")
 // var oProcess = seApp.processes.whose({ frontmost: true })
 // JSON.stringify({
