@@ -5,13 +5,13 @@ use whatawhat_lib::{GenericWindowManager, WindowManager as _};
 
 // #[tokio::main]
 fn main() {
-    let thread_handle = thread::spawn(|| {
-        let result = catch_unwind(|| {
-            tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .build()
-                .unwrap()
-                .block_on(async {
+    // let thread_handle = thread::spawn(|| {
+    //     let result = catch_unwind(|| {
+    //         tokio::runtime::Builder::new_current_thread()
+    //             .enable_all()
+    //             .build()
+    //             .unwrap()
+    //             .block_on(async {
                     let mut window_manager =
                         GenericWindowManager::new(Duration::from_secs(10), None).unwrap();
 
@@ -27,11 +27,11 @@ fn main() {
                         println!("Active window: {:?}", active_window);
                         let idle_time = window_manager.is_idle();
                         println!("Idle time: {:?}", idle_time);
-                        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                        std::thread::sleep(std::time::Duration::from_secs(1));
                     }
-                });
-        });
-        dbg!(&result);
-    });
-    thread_handle.join().unwrap();
+    //             });
+    //     });
+    //     dbg!(&result);
+    // });
+    // thread_handle.join().unwrap();
 }
