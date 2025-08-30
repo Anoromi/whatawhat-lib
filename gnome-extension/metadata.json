@@ -1,0 +1,8 @@
+{
+  "name": "Focused Window D-Bus. Whatawhat-lib fork",
+  "description": "Exposes a D-Bus method to get active window title and class. Fork of https://github.com/flexagoon/focused-window-dbus.",
+  "uuid": "focused-window-dbus@whatawhat.anoromi.com",
+  "version": 8,
+  "url": "https://github.com/Anoromi/whatawhat-lib",
+  "shell-version": ["45", "46", "47", "48"]
+}

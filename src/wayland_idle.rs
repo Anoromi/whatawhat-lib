@@ -4,11 +4,10 @@ use super::wl_connection::{WlEventConnection, subscribe_state};
 use anyhow::Context as _;
 use chrono::{TimeDelta, Utc};
 use std::{
-    sync::{Arc, mpsc},
+    sync::{Arc, Mutex, mpsc},
     thread::{self, JoinHandle},
     time::Duration,
 };
-use tokio::sync::Mutex;
 use tracing::{error, info};
 use wayland_client::{
     Connection, Dispatch, Proxy, QueueHandle,
@@ -127,7 +126,7 @@ impl IdleWatcherRunner {
                 loop {
                     match idle_watcher.run_iteration() {
                         Ok(status) => {
-                            let mut current_idle_status = current_idle_status.blocking_lock();
+                            let mut current_idle_status = current_idle_status.lock().unwrap();
                             *current_idle_status = Some(status);
                         }
                         Err(e) => {
