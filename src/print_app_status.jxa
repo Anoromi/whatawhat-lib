@@ -10,6 +10,7 @@
 
 var seApp         = Application("System Events");
 var oProcess      = seApp.processes.whose({frontmost: true})[0];
+console.log(oProcess);
 var appName       = oProcess.displayedName();
 var unixId          = oProcess.unixId();
 
