@@ -10,7 +10,11 @@
 
 var seApp         = Application("System Events");
 var oProcess      = seApp.processes.whose({frontmost: true})[0];
-console.log(oProcess);
+if (!oProcess) {
+  console.log("No process found");
+  return;
+}
+
 var appName       = oProcess.displayedName();
 var unixId          = oProcess.unixId();
 
