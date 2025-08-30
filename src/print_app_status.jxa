@@ -8,13 +8,14 @@
 // - interactive repl: `osascript -il JavaScript`
 // - API reference: Script Editor -> File -> Open Dictionary
 
-var seApp = Application("System Events")
-var oProcess = seApp.processes.whose({ frontmost: true })
-JSON.stringify({
-  length: oProcess.length,
-  name: oProcess.name(),
-  id: oProcess.id(),
-})
+console.log("Hello, world!")
+// var seApp = Application("System Events")
+// var oProcess = seApp.processes.whose({ frontmost: true })
+// JSON.stringify({
+//   length: oProcess.length,
+//   name: oProcess.name(),
+//   id: oProcess.id(),
+// })
 // console.log(oProcess)
 // if (!oProcess) {
 //   JSON.stringify(null)
