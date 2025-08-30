@@ -9,7 +9,7 @@
 // - API reference: Script Editor -> File -> Open Dictionary
 
 var seApp = Application("System Events")
-var oProcess = seApp.processes.whose({ frontmost: true })
+var oProcess = seApp.processes.whose({ frontmost: true })[0]
 JSON.stringify({
   length: oProcess.length,
   name: oProcess.name(),
