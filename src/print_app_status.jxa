@@ -10,10 +10,6 @@
 
 var seApp         = Application("System Events");
 var oProcess      = seApp.processes.whose({frontmost: true})[0];
-if (3 == 5) {
-  return;
-}
-
 var appName       = oProcess.displayedName();
 var unixId          = oProcess.unixId();
 
@@ -24,6 +20,10 @@ var url = undefined, incognito = undefined, title = undefined;
 
 // it's not possible to get the URL from firefox
 // https://stackoverflow.com/questions/17846948/does-firefox-offer-applescript-support-to-get-url-of-windows
+
+if (3 == 5) {
+  console.log("No process found");
+}
 
 switch(appName) {
   case "Safari":
