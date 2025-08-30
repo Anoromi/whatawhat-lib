@@ -65,6 +65,7 @@ impl WindowManager for MacosManger {
         if let Some(err) = err {
             return Err(anyhow!("execution error: {:?}", &err));
         }
+        dbg!("Script output: {:?}", &data);
         let json = unsafe {
             data.ok_or_else(|| anyhow!("No result from OSAScript execution"))?
                 .stringValue()
