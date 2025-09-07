@@ -1,13 +1,15 @@
 use std::time::Duration;
 
 use anyhow::{Context, Result, anyhow};
-use async_trait::async_trait;
 use serde::Deserialize;
 use tracing::{debug, trace};
-use zbus::Connection;
+use zbus::blocking::Connection;
 
 use crate::{
     ActiveWindowData, WindowManager,
+    config::WatcherConfig,
+    linux_desktop::{DesktopInfo, LinuxDesktopInfo},
+    simple_cache::SimpleCache,
     utils::{is_gnome, is_x11},
 };
 
@@ -15,7 +17,11 @@ pub struct GnomeWindowWatcher {
     dbus_connection: Connection,
     last_title: String,
     last_app_id: String,
+    app_name: String,
+    process_path: String,
     idle_timeout: Duration,
+    desktop_info_cache: SimpleCache<String, DesktopInfo>,
+    linux_desktop_info: LinuxDesktopInfo,
 }
 
 #[derive(Deserialize, Default)]
@@ -25,17 +31,14 @@ struct WindowData {
 }
 
 impl GnomeWindowWatcher {
-    async fn get_window_data(&self) -> anyhow::Result<WindowData> {
-        let call_response = self
-            .dbus_connection
-            .call_method(
-                Some("org.gnome.Shell"),
-                "/org/gnome/shell/extensions/FocusedWindow",
-                Some("org.gnome.shell.extensions.FocusedWindow"),
-                "Get",
-                &(),
-            )
-            .await;
+    fn get_window_data(&self) -> anyhow::Result<WindowData> {
+        let call_response = self.dbus_connection.call_method(
+            Some("org.gnome.Shell"),
+            "/org/gnome/shell/extensions/WhatawhatFocusedWindow",
+            Some("org.gnome.shell.extensions.WhatawhatFocusedWindow"),
+            "Get",
+            &(),
+        );
 
         match call_response {
             Ok(json) => {
@@ -58,17 +61,14 @@ impl GnomeWindowWatcher {
         }
     }
 
-    async fn get_idle_time_data(&self) -> Result<u64> {
-        let call_response = self
-            .dbus_connection
-            .call_method(
-                Some("org.gnome.Shell"),
-                "/org/gnome/Mutter/IdleMonitor/Core",
-                Some("org.gnome.Mutter.IdleMonitor"),
-                "GetIdletime",
-                &(),
-            )
-            .await;
+    fn get_idle_time_data(&self) -> Result<u64> {
+        let call_response = self.dbus_connection.call_method(
+            Some("org.gnome.Shell"),
+            "/org/gnome/Mutter/IdleMonitor/Core",
+            Some("org.gnome.Mutter.IdleMonitor"),
+            "GetIdletime",
+            &(),
+        );
         let result = call_response
             .with_context(|| "Failed to get idle time")?
             .body()
@@ -79,15 +79,19 @@ impl GnomeWindowWatcher {
 }
 
 impl GnomeWindowWatcher {
-    pub async fn new(idle_timeout: Duration) -> Result<Self> {
-        let loader = async || -> Result<Self> {
+    pub fn new(config: WatcherConfig) -> Result<Self> {
+        let loader = || -> Result<Self> {
             let watcher = Self {
-                dbus_connection: Connection::session().await?,
+                dbus_connection: Connection::session()?,
                 last_app_id: String::new(),
                 last_title: String::new(),
-                idle_timeout,
+                idle_timeout: config.idle_timeout,
+                app_name: String::new(),
+                process_path: String::new(),
+                desktop_info_cache: SimpleCache::new(config.cache_config.clone()),
+                linux_desktop_info: LinuxDesktopInfo::new(),
             };
-            watcher.get_window_data().await?;
+            watcher.get_window_data()?;
             Ok(watcher)
         };
 
@@ -103,7 +107,7 @@ impl GnomeWindowWatcher {
 
         let mut watcher = Err(anyhow::anyhow!(""));
         for _ in 0..3 {
-            watcher = loader().await;
+            watcher = loader();
             if let Err(e) = &watcher {
                 debug!("Failed to load Gnome Wayland watcher: {e}");
                 std::thread::sleep(std::time::Duration::from_secs(3));
@@ -113,10 +117,9 @@ impl GnomeWindowWatcher {
     }
 }
 
-#[async_trait]
 impl WindowManager for GnomeWindowWatcher {
-    async fn get_active_window_data(&mut self) -> Result<ActiveWindowData> {
-        let data = self.get_window_data().await;
+    fn get_active_window_data(&mut self) -> Result<ActiveWindowData> {
+        let data = self.get_window_data();
         if let Err(e) = data {
             if e.to_string().contains("Object does not exist at path") {
                 trace!("The extension seems to have stopped");
@@ -135,14 +138,30 @@ impl WindowManager for GnomeWindowWatcher {
             self.last_title = data.title;
         }
 
+        let (process_path, app_name) = match self.desktop_info_cache.get(&self.last_app_id) {
+            Some(extra_info) => (Some(extra_info.process_path), Some(extra_info.app_name)),
+            None => {
+                if let Some(extra_info) = self.linux_desktop_info.get_extra_info(&self.last_app_id)
+                {
+                    self.desktop_info_cache
+                        .set(self.last_app_id.clone(), extra_info.clone());
+                    (Some(extra_info.process_path), Some(extra_info.app_name))
+                } else {
+                    (None, None)
+                }
+            }
+        };
+
         Ok(ActiveWindowData {
             window_title: self.last_title.clone().into(),
-            app_identifier: self.last_app_id.clone().into(),
+            app_identifier: Some(self.last_app_id.clone().into()),
+            process_path,
+            app_name,
         })
     }
 
-    async fn is_idle(&mut self) -> Result<bool> {
-        let data = self.get_idle_time_data().await?;
+    fn is_idle(&mut self) -> Result<bool> {
+        let data = self.get_idle_time_data()?;
         Ok(data > self.idle_timeout.as_millis() as u64)
     }
 }

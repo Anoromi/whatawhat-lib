@@ -10,15 +10,11 @@ repository = "https://github.com/Anoromi/whatawhat-lib"
 
 [dependencies]
 anyhow = { version = "1.0.98", features = ["backtrace"] }
-async-trait = "0.1.88"
-cfg-if = "1.0.0"
 serde = { version = "1.0.219", features = ["derive"] }
-serde_json = "1.0.142"
+serde_json = "1"
 sysinfo = "0.36.1"
 tracing = "0.1.41"
-zbus = { version = "5.9.0", optional = true }
-tokio = { version = "1", features = ["sync", "rt"] }
-tracing-subscriber = "0.3.19"
+zbus = { version = "5.9.0", features = ["blocking"], optional = true }
 wayland-client = { version = "0.31.11", optional = true }
 wayland-protocols = { version = "0.32.9", features = [
 	"staging",
@@ -31,6 +27,21 @@ wayland-protocols-wlr = { version = "0.3.9", features = [
 	"client",
 ], optional = true }
 chrono = "0.4.41"
+mockall = { version = "0.13.1", optional = true }
+freedesktop-desktop-entry = { version = "0.7.14", optional = true }
+pelite = { version = "0.10.0", optional = true }
+
+objc2 = { version = "=0.6.2", optional = true }
+objc2-foundation = { version = "=0.3.1", optional = true, features = [
+	"NSDictionary",
+	"NSString",
+	"NSAppleScript",
+	"NSURL",
+] }
+objc2-osa-kit = { version = "=0.3.1", optional = true }
+objc2-core-graphics = { version = "0.3.1", optional = true }
+derive_builder = "0.20.2"
+
 
 [dependencies.xcb]
 version = "^1.6"
@@ -51,18 +62,35 @@ features = [
 ]
 optional = true
 
+
 [features]
-win = ["dep:windows"]
-x11 = ["dep:xcb"]
-gnome = ["dep:zbus"]
+win = ["dep:windows", "dep:pelite"]
+x11 = ["dep:xcb", "dep:freedesktop-desktop-entry"]
+gnome = ["dep:zbus", "dep:freedesktop-desktop-entry"]
 wayland = [
 	"dep:wayland-client",
 	"dep:wayland-protocols",
 	"dep:wayland-protocols-plasma",
 	"dep:wayland-protocols-wlr",
+	"dep:freedesktop-desktop-entry",
 ]
-kde = ["wayland", "dep:zbus"]
+kde = [
+	"wayland",
+	"dep:zbus",
+	"dep:freedesktop-desktop-entry",
+]
+mock = ["dep:mockall"]
+macos = [
+	"dep:objc2-foundation",
+	"dep:objc2",
+	"dep:objc2-osa-kit",
+	"dep:objc2-core-graphics",
+]
+
 
 [dev-dependencies]
-mockall = "0.13.1"
 tokio = { version = "1.47.1", features = ["full"] }
+tracing-subscriber = "0.3.19"
+
+[profile.release]
+debug = true

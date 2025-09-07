@@ -2,15 +2,16 @@
 use {
     std::time::Duration,
     tracing::Level,
-    whatawhat_lib::{WindowManager as _, kde::KdeWindowManager},
+    whatawhat_lib::{WindowManager as _, kde::KdeWindowManager, config::WatcherConfig},
 };
 
 #[cfg(feature = "kde")]
-#[tokio::main]
-async fn main() {
-    let mut window_manager = KdeWindowManager::new(Duration::from_secs(10))
-        .await
-        .unwrap();
+fn main() {
+    let config = WatcherConfig {
+        idle_timeout: Duration::from_secs(10),
+        ..Default::default()
+    };
+    let mut window_manager = KdeWindowManager::new(config).unwrap();
 
     tracing_subscriber::fmt()
         // all spans/events with a level higher than TRACE (e.g, info, warn, etc.)
@@ -20,11 +21,11 @@ async fn main() {
         .init();
 
     loop {
-        let active_window = window_manager.get_active_window_data().await.unwrap();
+        let active_window = window_manager.get_active_window_data().unwrap();
         println!("Active window: {:?}", active_window);
-        let idle_time = window_manager.is_idle().await.unwrap();
+        let idle_time = window_manager.is_idle().unwrap();
         println!("Idle time: {:?}", idle_time);
-        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+        std::thread::sleep(std::time::Duration::from_secs(1));
     }
 }
 #[cfg(not(feature = "kde"))]

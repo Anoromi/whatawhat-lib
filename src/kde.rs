@@ -4,19 +4,18 @@
  * Inspired by https://github.com/k0kubun/xremap/
  */
 use crate::idle::Status;
+use crate::linux_desktop::{DesktopInfo, LinuxDesktopInfo};
+use crate::simple_cache::SimpleCache;
 use crate::wayland_idle::IdleWatcherRunner;
-use crate::{ActiveWindowData, WindowManager};
+use crate::{ActiveWindowData, WindowManager, config::WatcherConfig};
 use anyhow::{Context, Result, anyhow};
-use async_trait::async_trait;
 use std::env::{self, temp_dir};
 use std::path::Path;
-use std::sync::{Arc, mpsc::channel};
-use std::time::Duration;
-use tokio::sync::Mutex;
-use tokio::task::JoinHandle;
+use std::sync::Arc;
+use std::sync::Mutex;
 use tracing::{debug, error};
+use zbus::blocking::{Connection, connection::Builder as ConnectionBuilder};
 use zbus::interface;
-use zbus::{Connection, conn::Builder as ConnectionBuilder};
 
 const KWIN_SCRIPT_NAME: &str = "whatawhat-lib";
 const KWIN_SCRIPT: &str = include_str!("kde.js");
@@ -34,19 +33,19 @@ impl KWinScript {
         }
     }
 
-    async fn load(&mut self) -> anyhow::Result<()> {
+    fn load(&mut self) -> anyhow::Result<()> {
         let path = temp_dir().join("whatawhat-lib.js");
         std::fs::write(&path, KWIN_SCRIPT).with_context(|| "Failed to create kwin script")?;
 
-        let number = self.get_registered_number(&path).await?;
-        let result = self.start(number).await;
+        let number = self.get_registered_number(&path)?;
+        let result = self.start(number);
         std::fs::remove_file(&path)?;
         self.is_loaded = true;
 
         result
     }
 
-    async fn is_loaded(&self) -> anyhow::Result<bool> {
+    fn is_loaded(&self) -> anyhow::Result<bool> {
         self.dbus_connection
             .call_method(
                 Some("org.kde.KWin"),
@@ -54,14 +53,13 @@ impl KWinScript {
                 Some("org.kde.kwin.Scripting"),
                 "isScriptLoaded",
                 &KWIN_SCRIPT_NAME,
-            )
-            .await?
+            )?
             .body()
             .deserialize()
             .map_err(std::convert::Into::into)
     }
 
-    async fn get_registered_number(&self, path: &Path) -> anyhow::Result<i32> {
+    fn get_registered_number(&self, path: &Path) -> anyhow::Result<i32> {
         let temp_path = path
             .to_str()
             .ok_or(anyhow!("Temporary file path is not valid"))?;
@@ -74,14 +72,13 @@ impl KWinScript {
                 "loadScript",
                 // since OsStr does not implement zvariant::Type, the temp-path must be valid utf-8
                 &(temp_path, KWIN_SCRIPT_NAME),
-            )
-            .await?
+            )?
             .body()
             .deserialize()
             .map_err(std::convert::Into::into)
     }
 
-    async fn unload(&self) -> anyhow::Result<bool> {
+    fn unload(&self) -> anyhow::Result<bool> {
         self.dbus_connection
             .call_method(
                 Some("org.kde.KWin"),
@@ -89,17 +86,16 @@ impl KWinScript {
                 Some("org.kde.kwin.Scripting"),
                 "unloadScript",
                 &KWIN_SCRIPT_NAME,
-            )
-            .await?
+            )?
             .body()
             .deserialize()
             .map_err(std::convert::Into::into)
     }
 
-    async fn start(&self, script_number: i32) -> anyhow::Result<()> {
+    fn start(&self, script_number: i32) -> anyhow::Result<()> {
         debug!("Starting KWin script {script_number}");
 
-        let path = if self.get_major_version().await < 6 {
+        let path = if self.get_major_version() < 6 {
             format!("/{script_number}")
         } else {
             format!("/Scripting/Script{script_number}")
@@ -112,23 +108,20 @@ impl KWinScript {
                 "run",
                 &(),
             )
-            .await
             .with_context(|| "Error on starting the script")?;
         Ok(())
     }
 
-    async fn get_major_version(&self) -> i8 {
+    fn get_major_version(&self) -> i8 {
         if let Ok(version) = Self::get_major_version_from_env() {
             debug!("KWin version from KDE_SESSION_VERSION: {version}");
 
             version
         } else {
-            self.get_major_version_from_dbus()
-                .await
-                .unwrap_or_else(|e| {
-                    error!("Failed to get KWin version: {e}");
-                    5
-                })
+            self.get_major_version_from_dbus().unwrap_or_else(|e| {
+                error!("Failed to get KWin version: {e}");
+                5
+            })
         }
     }
 
@@ -138,7 +131,7 @@ impl KWinScript {
             .map_err(std::convert::Into::into)
     }
 
-    async fn get_major_version_from_dbus(&self) -> anyhow::Result<i8> {
+    fn get_major_version_from_dbus(&self) -> anyhow::Result<i8> {
         let support_information: String = self
             .dbus_connection
             .call_method(
@@ -147,8 +140,7 @@ impl KWinScript {
                 Some("org.kde.KWin"),
                 "supportInformation",
                 &(),
-            )
-            .await?
+            )?
             .body()
             .deserialize()?;
 
@@ -176,45 +168,42 @@ impl KWinScript {
 
 impl Drop for KWinScript {
     fn drop(&mut self) {
-        // if self.is_loaded {
-        //     tokio::runtime::Builder::new_current_thread()
-        //         .enable_all()
-        //         .build()
-        //         .unwrap()
-        //         .block_on(async {
-        //             debug!("Unloading KWin script");
-        //             if let Err(e) = self.unload().await {
-        //                 error!("Problem during stopping KWin script: {e}");
-        //             };
-        //         });
-        // }
+        if let Err(e) = self.unload() {
+            error!("Problem during stopping KWin script: {e}");
+        };
     }
 }
 
-async fn send_active_window(
+fn send_active_window(
     active_window: &Arc<Mutex<ActiveWindow>>,
 ) -> anyhow::Result<ActiveWindowData> {
-    let active_window = active_window.lock().await;
+    let active_window = active_window.lock().expect("Mutex poisoned");
 
     Ok(ActiveWindowData {
         window_title: active_window.caption.clone().into(),
-        app_identifier: active_window.resource_name.clone().into(),
+        app_identifier: Some(active_window.resource_name.clone().into()),
+        process_path: active_window.process_path.clone(),
+        app_name: active_window.app_name.clone(),
     })
 }
 
 struct ActiveWindow {
-    resource_class: String,
-    resource_name: String,
-    caption: String,
+    resource_class: Arc<str>,
+    resource_name: Arc<str>,
+    caption: Arc<str>,
+    process_path: Option<Arc<str>>,
+    app_name: Option<Arc<str>>,
 }
 
 struct ActiveWindowInterface {
     active_window: Arc<Mutex<ActiveWindow>>,
+    desktop_info_cache: SimpleCache<String, DesktopInfo>,
+    linux_desktop_info: LinuxDesktopInfo,
 }
 
 #[interface(name = "com.github.anoromi.whatawhat_lib")]
 impl ActiveWindowInterface {
-    async fn notify_active_window(
+    fn notify_active_window(
         &mut self,
         caption: String,
         resource_class: String,
@@ -224,26 +213,43 @@ impl ActiveWindowInterface {
         debug!(
             "Active window class: \"{resource_class}\", name: \"{resource_name}\", caption: \"{caption}\""
         );
-        let mut active_window = self.active_window.lock().await;
-        active_window.caption = caption;
-        active_window.resource_class = resource_class;
-        active_window.resource_name = resource_name;
+
+        let (process_path, app_name) = match self.desktop_info_cache.get(&resource_name) {
+            Some(extra_info) => (Some(extra_info.process_path), Some(extra_info.app_name)),
+            None => {
+                if let Some(extra_info) = self.linux_desktop_info.get_extra_info(&resource_name) {
+                    self.desktop_info_cache
+                        .set(resource_name.clone(), extra_info.clone());
+                    (Some(extra_info.process_path), Some(extra_info.app_name))
+                } else {
+                    (None, None)
+                }
+            }
+        };
+
+        let mut active_window = self.active_window.lock().expect("Mutex poisoned");
+        active_window.caption = caption.into();
+        active_window.resource_class = resource_class.into();
+        active_window.resource_name = resource_name.into();
+
+        active_window.process_path = process_path;
+        active_window.app_name = app_name;
     }
 }
 
 pub struct KdeWindowManager {
     active_window: Arc<Mutex<ActiveWindow>>,
     _kwin_script: KWinScript,
-    _task: JoinHandle<()>,
+    dbus_connection: Connection,
     pub idle_watcher: IdleWatcherRunner,
 }
 
 impl KdeWindowManager {
-    pub async fn new(idle_timeout: Duration) -> anyhow::Result<Self> {
-        let mut kwin_script = KWinScript::new(Connection::session().await?);
-        if kwin_script.is_loaded().await? {
+    pub fn new(config: WatcherConfig) -> anyhow::Result<Self> {
+        let mut kwin_script = KWinScript::new(Connection::session()?);
+        if kwin_script.is_loaded()? {
             debug!("KWin script is already loaded, unloading");
-            kwin_script.unload().await?;
+            kwin_script.unload()?;
         }
         if env::var("WAYLAND_DISPLAY").is_err()
             && env::var_os("XDG_SESSION_TYPE").unwrap_or("".into()) == "x11"
@@ -251,60 +257,65 @@ impl KdeWindowManager {
             return Err(anyhow!("X11 should be tried instead"));
         }
 
-        kwin_script.load().await.unwrap();
+        kwin_script.load().unwrap();
 
         let active_window = Arc::new(Mutex::new(ActiveWindow {
-            caption: String::new(),
-            resource_name: String::new(),
-            resource_class: String::new(),
+            caption: "".into(),
+            resource_name: "".into(),
+            resource_class: "".into(),
+            process_path: None,
+            app_name: None,
         }));
         let active_window_interface = ActiveWindowInterface {
             active_window: Arc::clone(&active_window),
+            desktop_info_cache: SimpleCache::new(config.cache_config),
+            linux_desktop_info: LinuxDesktopInfo::new(),
         };
 
-        let (tx, rx) = channel();
-        async fn get_connection(
-            active_window_interface: ActiveWindowInterface,
-        ) -> zbus::Result<Connection> {
-            ConnectionBuilder::session()?
-                .name("com.github.anoromi.whatawhat_lib")?
-                .serve_at("/com/github/anoromi/whatawhat_lib", active_window_interface)?
-                .build()
-                .await
-        }
+        // Build the DBus connection and register the interface synchronously (no extra thread).
+        let dbus_connection = ConnectionBuilder::session()?
+            .name("com.github.anoromi.whatawhat_lib")?
+            .serve_at("/com/github/anoromi/whatawhat_lib", active_window_interface)?
+            .build()
+            .map_err(|e| anyhow!("Failed to run a DBus interface: {e}"))?;
 
-        let task = tokio::spawn(async move {
-            match get_connection(active_window_interface).await {
-                Ok(connection) => {
-                    tx.send(None).unwrap();
-                    loop {
-                        connection.monitor_activity().await;
-                    }
-                }
-                Err(e) => tx.send(Some(e)).unwrap(),
-            }
-        });
-        if let Some(error) = rx.recv().unwrap() {
-            return Err(anyhow!("Failed to run a DBus interface: {error}"));
-        }
+        // Intentionally avoid initial monitor_activity() here to ensure we only process
+        // events when the caller invokes methods (run-when-called semantics).
 
         Ok(Self {
             active_window,
             _kwin_script: kwin_script,
-            _task: task,
-            idle_watcher: IdleWatcherRunner::new(idle_timeout.as_millis() as u32)?,
+            dbus_connection,
+            idle_watcher: IdleWatcherRunner::new(config.idle_timeout.as_millis() as u32)?,
         })
+    }
+
+    fn pump_dbus(&self) {
+        // Best-effort: process any pending DBus activity inline.
+        // monitor_activity blocks waiting for IO when nothing is pending on real KDE,
+        // but KWin sends promptly on activation events; calls here are short in practice.
+        // If this turns out to block undesirably in some environments, consider adding
+        // a timed variant or switching to async with a local runtime.
+        self.dbus_connection.monitor_activity();
     }
 }
 
-#[async_trait]
 impl WindowManager for KdeWindowManager {
-    async fn get_active_window_data(&mut self) -> Result<ActiveWindowData> {
-        send_active_window(&self.active_window).await
+    fn get_active_window_data(&mut self) -> Result<ActiveWindowData> {
+        // Process any pending DBus events so our state is up-to-date when queried.
+        self.pump_dbus();
+        send_active_window(&self.active_window)
     }
 
-    async fn is_idle(&mut self) -> Result<bool> {
-        let status_guard = self.idle_watcher.current_idle_status.lock().await;
+    fn is_idle(&mut self) -> Result<bool> {
+        // Keep consistency by pumping DBus here too, in case user calls this independently.
+        self.pump_dbus();
+
+        let status_guard = self
+            .idle_watcher
+            .current_idle_status
+            .lock()
+            .expect("Mutex poisoned");
         match *status_guard {
             Some(Status::Active { .. }) => Ok(false),
             Some(Status::Idle { .. }) => Ok(true),

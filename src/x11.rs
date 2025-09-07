@@ -4,7 +4,6 @@
 use std::time::Duration;
 
 use anyhow::{Result, anyhow};
-use async_trait::async_trait;
 use sysinfo::Pid;
 use tracing::{error, instrument};
 use xcb::{
@@ -13,7 +12,7 @@ use xcb::{
     x::{self, ATOM_ANY, Atom, Drawable, GetProperty, InternAtom, Window},
 };
 
-use super::{ActiveWindowData, WindowManager};
+use super::{ActiveWindowData, WindowManager, config::WatcherConfig};
 
 fn get_pid_atom(conn: &Connection) -> Result<Atom> {
     let reply = conn.wait_for_reply(conn.send_request(&InternAtom {
@@ -116,23 +115,26 @@ impl WindowData {
             .ok_or_else(|| anyhow!("Failed to get pid: pid is None"))?;
         let process_name = get_process_name(process)?
             .ok_or_else(|| anyhow!("Failed to get process name: process name is None"))?;
+
         Ok(ActiveWindowData {
             window_title: window_name.into(),
-            app_identifier: process_name.into(),
+            process_path: Some(process_name.into()),
+            app_identifier: None,
+            app_name: None,
         })
     }
 }
 
 pub struct LinuxWindowManager {
     data: Option<WindowData>,
-    inactive_timeout: Duration,
+    idle_timeout: Duration,
 }
 
 impl LinuxWindowManager {
-    pub fn new(inactive_timeout: Duration) -> Result<Self> {
+    pub fn new(config: WatcherConfig) -> Result<Self> {
         Ok(Self {
             data: None,
-            inactive_timeout,
+            idle_timeout: config.idle_timeout,
         })
     }
 
@@ -178,10 +180,9 @@ impl LinuxWindowManager {
     }
 }
 
-#[async_trait]
 impl WindowManager for LinuxWindowManager {
     #[instrument(skip(self))]
-    async fn get_active_window_data(&mut self) -> Result<ActiveWindowData> {
+    fn get_active_window_data(&mut self) -> Result<ActiveWindowData> {
         let data = self
             .try_get_data()
             .inspect_err(|e| error!("Failed getting connection {e:?}"))?;
@@ -191,7 +192,7 @@ impl WindowManager for LinuxWindowManager {
     }
 
     #[instrument(skip(self))]
-    async fn is_idle(&mut self) -> Result<bool> {
+    fn is_idle(&mut self) -> Result<bool> {
         let data = self
             .try_get_data()
             .inspect_err(|e| error!("Failed getting connection {e:?}"))?;
@@ -204,6 +205,6 @@ impl WindowManager for LinuxWindowManager {
             .connection
             .wait_for_reply(idle)
             .inspect_err(|e| error!("Failed getting idle {e}"))?;
-        Ok(reply.ms_since_user_input() as u128 > self.inactive_timeout.as_millis())
+        Ok(reply.ms_since_user_input() as u128 > self.idle_timeout.as_millis())
     }
 }
