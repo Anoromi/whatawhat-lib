@@ -10,8 +10,10 @@
 
 // null.hello();
 // console.log(Date.now())
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
 var seApp = Application("System Events")
-for (let v of seApp.processes) {
+while (true) {
   var oProcess = seApp.processes.whose({ frontmost: true })
   console.log(
     JSON.stringify({
@@ -20,4 +22,6 @@ for (let v of seApp.processes) {
       id: oProcess.id(),
     })
   )
+  await wait(1000)
 }
+
