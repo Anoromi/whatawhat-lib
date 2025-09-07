@@ -13,15 +13,17 @@
 
 var seApp = Application("System Events")
 function hmhm() {
-  var oProcess = seApp.processes.whose({ frontmost: true })
-  console.log(
-    JSON.stringify({
-      length: oProcess.length,
-      name: oProcess.name(),
-      id: oProcess.id(),
-    })
-  )
-  setTimeout(hmhm, 1000)
+  while (true) {
+    var oProcess = seApp.processes.whose({ frontmost: true })
+    console.log(
+      JSON.stringify({
+        length: oProcess.length,
+        name: oProcess.name(),
+        id: oProcess.id(),
+      })
+    )
+    seApp.delay(1)
+  }
 }
 
 hmhm()
