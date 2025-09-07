@@ -1,11 +1,8 @@
 //! Contains logic for extracting records through x11. The implementation uses xcb for communication
 //! with the server.
 
-use std::time::Duration;
-
 use crate::{
-    simple_cache::CacheConfig,
-    utils::default_cache_config,
+    config::WatcherConfig,
     windows_desktop::{WindowsAppInfo, WindowsDesktopInfo},
 };
 use anyhow::{Result, anyhow};
@@ -53,18 +50,16 @@ unsafe fn get_window_title(window_handle: HWND, text: &mut [u16]) -> String {
 }
 
 pub struct WindowsWindowManager {
-    idle_timeout: Duration,
+    idle_timeout: std::time::Duration,
     desktop_info_cache: crate::simple_cache::SimpleCache<String, WindowsAppInfo>,
     windows_desktop_info: WindowsDesktopInfo,
 }
 
 impl WindowsWindowManager {
-    pub fn new(idle_timeout: Duration, cache_config: Option<CacheConfig>) -> Self {
+    pub fn new(config: WatcherConfig) -> Self {
         Self {
-            idle_timeout,
-            desktop_info_cache: crate::simple_cache::SimpleCache::new(
-                cache_config.unwrap_or(default_cache_config()),
-            ),
+            idle_timeout: config.idle_timeout,
+            desktop_info_cache: crate::simple_cache::SimpleCache::new(config.cache_config),
             windows_desktop_info: WindowsDesktopInfo::new(),
         }
     }

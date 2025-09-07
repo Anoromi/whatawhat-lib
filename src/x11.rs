@@ -12,7 +12,7 @@ use xcb::{
     x::{self, ATOM_ANY, Atom, Drawable, GetProperty, InternAtom, Window},
 };
 
-use super::{ActiveWindowData, WindowManager};
+use super::{ActiveWindowData, WindowManager, config::WatcherConfig};
 
 fn get_pid_atom(conn: &Connection) -> Result<Atom> {
     let reply = conn.wait_for_reply(conn.send_request(&InternAtom {
@@ -127,14 +127,14 @@ impl WindowData {
 
 pub struct LinuxWindowManager {
     data: Option<WindowData>,
-    inactive_timeout: Duration,
+    idle_timeout: Duration,
 }
 
 impl LinuxWindowManager {
-    pub fn new(inactive_timeout: Duration) -> Result<Self> {
+    pub fn new(config: WatcherConfig) -> Result<Self> {
         Ok(Self {
             data: None,
-            inactive_timeout,
+            idle_timeout: config.idle_timeout,
         })
     }
 
@@ -205,6 +205,6 @@ impl WindowManager for LinuxWindowManager {
             .connection
             .wait_for_reply(idle)
             .inspect_err(|e| error!("Failed getting idle {e}"))?;
-        Ok(reply.ms_since_user_input() as u128 > self.inactive_timeout.as_millis())
+        Ok(reply.ms_since_user_input() as u128 > self.idle_timeout.as_millis())
     }
 }

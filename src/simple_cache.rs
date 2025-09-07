@@ -10,7 +10,7 @@ pub struct SimpleCache<G, T> {
     config: CacheConfig,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct CacheConfig {
     pub ttl: Duration,
     pub max_size: usize,

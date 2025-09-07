@@ -3,7 +3,7 @@ use std::{panic::catch_unwind, thread, time::Duration};
 use tracing::Level;
 use whatawhat_lib::{
     GenericWindowManager, WindowManager as _,
-    config::{WatcherConfig, WatcherConfigBuilder},
+    config::WatcherConfigBuilder,
 };
 
 // #[tokio::main]

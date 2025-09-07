@@ -5,15 +5,14 @@
  */
 use crate::idle::Status;
 use crate::linux_desktop::{DesktopInfo, LinuxDesktopInfo};
-use crate::simple_cache::{CacheConfig, SimpleCache};
+use crate::simple_cache::SimpleCache;
 use crate::wayland_idle::IdleWatcherRunner;
-use crate::{ActiveWindowData, WindowManager};
+use crate::{ActiveWindowData, WindowManager, config::WatcherConfig};
 use anyhow::{Context, Result, anyhow};
 use std::env::{self, temp_dir};
 use std::path::Path;
 use std::sync::Arc;
 use std::sync::Mutex;
-use std::time::Duration;
 use tracing::{debug, error};
 use zbus::blocking::{Connection, connection::Builder as ConnectionBuilder};
 use zbus::interface;
@@ -246,7 +245,7 @@ pub struct KdeWindowManager {
 }
 
 impl KdeWindowManager {
-    pub fn new(idle_timeout: Duration) -> anyhow::Result<Self> {
+    pub fn new(config: WatcherConfig) -> anyhow::Result<Self> {
         let mut kwin_script = KWinScript::new(Connection::session()?);
         if kwin_script.is_loaded()? {
             debug!("KWin script is already loaded, unloading");
@@ -269,10 +268,7 @@ impl KdeWindowManager {
         }));
         let active_window_interface = ActiveWindowInterface {
             active_window: Arc::clone(&active_window),
-            desktop_info_cache: SimpleCache::new(CacheConfig {
-                ttl: Duration::from_secs(60 * 60 * 24),
-                max_size: 1000,
-            }),
+            desktop_info_cache: SimpleCache::new(config.cache_config),
             linux_desktop_info: LinuxDesktopInfo::new(),
         };
 
@@ -290,7 +286,7 @@ impl KdeWindowManager {
             active_window,
             _kwin_script: kwin_script,
             dbus_connection,
-            idle_watcher: IdleWatcherRunner::new(idle_timeout.as_millis() as u32)?,
+            idle_watcher: IdleWatcherRunner::new(config.idle_timeout.as_millis() as u32)?,
         })
     }
 

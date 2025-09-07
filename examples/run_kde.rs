@@ -2,12 +2,16 @@
 use {
     std::time::Duration,
     tracing::Level,
-    whatawhat_lib::{WindowManager as _, kde::KdeWindowManager},
+    whatawhat_lib::{WindowManager as _, kde::KdeWindowManager, config::WatcherConfig},
 };
 
 #[cfg(feature = "kde")]
 fn main() {
-    let mut window_manager = KdeWindowManager::new(Duration::from_secs(10)).unwrap();
+    let config = WatcherConfig {
+        idle_timeout: Duration::from_secs(10),
+        ..Default::default()
+    };
+    let mut window_manager = KdeWindowManager::new(config).unwrap();
 
     tracing_subscriber::fmt()
         // all spans/events with a level higher than TRACE (e.g, info, warn, etc.)

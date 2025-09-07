@@ -7,8 +7,9 @@ use zbus::blocking::Connection;
 
 use crate::{
     ActiveWindowData, WindowManager,
+    config::WatcherConfig,
     linux_desktop::{DesktopInfo, LinuxDesktopInfo},
-    simple_cache::{CacheConfig, SimpleCache},
+    simple_cache::SimpleCache,
     utils::{is_gnome, is_x11},
 };
 
@@ -78,19 +79,16 @@ impl GnomeWindowWatcher {
 }
 
 impl GnomeWindowWatcher {
-    pub fn new(idle_timeout: Duration) -> Result<Self> {
+    pub fn new(config: WatcherConfig) -> Result<Self> {
         let loader = || -> Result<Self> {
             let watcher = Self {
                 dbus_connection: Connection::session()?,
                 last_app_id: String::new(),
                 last_title: String::new(),
-                idle_timeout,
+                idle_timeout: config.idle_timeout,
                 app_name: String::new(),
                 process_path: String::new(),
-                desktop_info_cache: SimpleCache::new(CacheConfig {
-                    ttl: Duration::from_secs(60),
-                    max_size: 1000,
-                }),
+                desktop_info_cache: SimpleCache::new(config.cache_config.clone()),
                 linux_desktop_info: LinuxDesktopInfo::new(),
             };
             watcher.get_window_data()?;

@@ -31,7 +31,7 @@ pub mod utils;
 pub mod gnome_install;
 pub mod config;
 
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 
 use anyhow::Result;
 #[cfg(any(
@@ -42,7 +42,7 @@ use anyhow::Result;
 ))]
 use tracing::info;
 
-use crate::{config::WatcherConfig, simple_cache::CacheConfig};
+use crate::config::WatcherConfig;
 
 #[derive(Debug, Clone)]
 pub struct ActiveWindowData {
@@ -73,18 +73,18 @@ pub struct GenericWindowManager {
 }
 
 impl GenericWindowManager {
-    pub fn new(config: WatcherConfig) -> Result<Self> {
+    pub fn new(_config: WatcherConfig) -> Result<Self> {
         #[cfg(feature = "win")]
         {
             use win::WindowsWindowManager;
             return Ok(Self {
-                inner: Box::new(WindowsWindowManager::new(config)),
+                inner: Box::new(WindowsWindowManager::new(_config)),
             });
         }
         #[cfg(feature = "gnome")]
         {
             use gnome::GnomeWindowWatcher;
-            let watcher = GnomeWindowWatcher::new(config);
+            let watcher = GnomeWindowWatcher::new(_config.clone());
             match watcher {
                 Ok(watcher) => {
                     let result = Ok(Self {
@@ -102,7 +102,7 @@ impl GenericWindowManager {
         #[cfg(feature = "kde")]
         {
             use kde::KdeWindowManager;
-            let watcher = KdeWindowManager::new(config);
+            let watcher = KdeWindowManager::new(_config.clone());
             match watcher {
                 Ok(watcher) => {
                     let result = Ok(Self {
@@ -113,14 +113,14 @@ impl GenericWindowManager {
                 }
                 Err(e) => {
                     use tracing::warn;
-                    warn!("Failed to load Gnome Wayland watcher: {e}");
+                    warn!("Failed to load Kde Wayland watcher: {e}");
                 }
             }
         }
         #[cfg(feature = "wayland")]
         {
             use wayland_wlr::WaylandWindowWatcher;
-            let watcher = WaylandWindowWatcher::new(config);
+            let watcher = WaylandWindowWatcher::new(_config.clone());
             match watcher {
                 Ok(watcher) => {
                     let result = Ok(Self {
@@ -138,7 +138,7 @@ impl GenericWindowManager {
         #[cfg(feature = "x11")]
         {
             use x11::LinuxWindowManager;
-            let watcher = LinuxWindowManager::new(config);
+            let watcher = LinuxWindowManager::new(_config.clone());
             match watcher {
                 Ok(watcher) => {
                     let result = Ok(Self {
@@ -157,7 +157,7 @@ impl GenericWindowManager {
         {
             use macos::MacosManger;
             return Ok(Self {
-                inner: Box::new(MacosManger::new(config)?),
+                inner: Box::new(MacosManger::new(_config)?),
             });
         }
         #[allow(unreachable_code)]

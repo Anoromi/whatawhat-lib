@@ -9,7 +9,7 @@ const DEFAULT_CACHE_CONFIG: CacheConfig = CacheConfig {
     max_size: 100,
 };
 
-#[derive(Builder)]
+#[derive(Clone, Default, Builder)]
 pub struct WatcherConfig {
     /// The timeout for the idle watcher.
     #[builder(default = Duration::from_secs(1))]
