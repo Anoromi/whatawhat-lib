@@ -23,3 +23,5 @@ function hmhm() {
   )
   setTimeout(hmhm, 1000)
 }
+
+hmhm()
