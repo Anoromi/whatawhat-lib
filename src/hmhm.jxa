@@ -22,7 +22,7 @@ function hmhm() {
     //     id: oProcess.id(),
     //   })
     // )
-    seApp.delay(1)
+    delay(1)
   }
 }
 
