@@ -162,10 +162,10 @@ fn create_separate_osascript_process(collection_interval: Duration) -> Result<Ma
     )]
     let mut process = Command::new("osascript")
         .stdout(Stdio::piped())
-        .arg("-e")
-        .arg(create_osascript_command(collection_interval))
         .arg("-l")
         .arg("JavaScript")
+        .arg("-e")
+        .arg(create_osascript_command(collection_interval))
         .spawn()
         .unwrap();
 
