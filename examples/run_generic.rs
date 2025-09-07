@@ -17,6 +17,7 @@ fn main() {
     //             .block_on(async {
     let mut window_manager = GenericWindowManager::new(
         WatcherConfigBuilder::default()
+            .am_on_main_thread(false)
             .idle_timeout(Duration::from_secs(10))
             .build()
             .unwrap(),
