@@ -8,41 +8,6 @@
 // - interactive repl: `osascript -il JavaScript`
 // - API reference: Script Editor -> File -> Open Dictionary
 
-// null.hello();
-// console.log(Date.now())
-ObjC.import("Foundation")
-
-var seApp = Application("System Events")
-function hmhm() {
-  while (true) {
-    // var oProcess = seApp.processes.whose({ frontmost: true })
-    console.log(getApp())
-    readOneLine()
-  }
-}
-
-function readOneLine() {
-  const stdin = $.NSFileHandle.fileHandleWithStandardInput
-  const nl = 10 // '\n'
-  const buffer = $.NSMutableData.data
-
-  while (true) {
-    const chunk = stdin.readDataOfLength(1)
-    if (chunk.length === 0) break // EOF
-    const byte = ObjC.unwrap(chunk).bytes()[0]
-    buffer.appendData(chunk)
-    if (byte === nl) break // stop at newline
-  }
-
-  if (buffer.length === 0) return ""
-
-  const str = $.NSString.alloc
-    .initWithDataEncoding(buffer, $.NSUTF8StringEncoding)
-    .stringByTrimmingCharactersInSet($.NSCharacterSet.newlineCharacterSet)
-
-  return ObjC.unwrap(str)
-}
-
 function getApp() {
   var oProcess = seApp.processes.whose({ frontmost: true })
   var appName = oProcess.displayedName()
@@ -92,4 +57,12 @@ function getApp() {
   })
 }
 
-hmhm()
+var seApp = Application("System Events")
+function runCollector() {
+  while (true) {
+    console.log(getApp())
+    delay(1)
+  }
+}
+
+runCollector()
