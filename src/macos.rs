@@ -225,6 +225,7 @@ function getApp() {{
   var seApp = Application("System Events")
   var oProcess = seApp.processes.whose({{ frontmost: true }})[0]
   var appName = oProcess.displayedName()
+  var unixId = oProcess.unixId()
 
   // as of 05/01/21 incognio & url are not actively used in AW
   // variables must be set to `undefined` since this script is re-run via osascript
@@ -275,6 +276,7 @@ function getApp() {{
     url,
     title,
     incognito,
+    unixId,
   }})
 }}
 
