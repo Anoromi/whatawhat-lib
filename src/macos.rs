@@ -61,7 +61,7 @@ impl WindowManager for MacosManger {
                 if let Some(err) = err {
                     return Err(anyhow!("execution error: {:?}", &err));
                 }
-                dbg!("Script output: {:?}", &data);
+                // dbg!("Script output: {:?}", &data);
                 let json = unsafe {
                     data.ok_or_else(|| anyhow!("No result from OSAScript execution"))?
                         .stringValue()
@@ -69,7 +69,7 @@ impl WindowManager for MacosManger {
                 .ok_or_else(|| anyhow!("Script did not return a string value"))?
                 .to_string();
 
-                dbg!("Script output: {}", &json);
+                // dbg!("Script output: {}", &json);
                 // Parse JXA output
                 let app_info: AppInfo = serde_json::from_str(&json)
                     .map_err(|e| anyhow!("Failed to parse JXA JSON: {e}; payload: {json}"))?;
