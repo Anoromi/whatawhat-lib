@@ -33,9 +33,9 @@ fn main() {
 
     loop {
         let active_window = window_manager.get_active_window_data();
-        println!("Active window: {:?}", active_window);
+        // println!("Active window: {:?}", active_window);
         let idle_time = window_manager.is_idle();
-        println!("Idle time: {:?}", idle_time);
+        // println!("Idle time: {:?}", idle_time);
         std::thread::sleep(std::time::Duration::from_secs(1));
     }
     //             });
