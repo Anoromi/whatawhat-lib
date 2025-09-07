@@ -8,83 +8,57 @@
 // - interactive repl: `osascript -il JavaScript`
 // - API reference: Script Editor -> File -> Open Dictionary
 
-// null.hello();
-// console.log(Date.now())
 var seApp = Application("System Events")
-var oProcess = seApp.processes.whose({ frontmost: true })
+var oProcess = seApp.processes.whose({ frontmost: true })[0]
+var appName = oProcess.displayedName()
 
-// let selected
-// for (let v of seApp.processes) {
-  // if (v.frontmost()) {
-  //   selected = v;
-  //   break;
-  // }
-// }
-// JSON.stringify({
-//   hello: Date.now().toString()
-// })
-// var oProcess = seApp.processes.whose({ frontmost: true })
-// JSON.stringify({
-//   length: oProcess.length,
-//   name: oProcess.name(),
-//   id: oProcess.id(),
-// })
-// console.log(oProcess)
-// if (!oProcess) {
-//   JSON.stringify(null)
-// } else {
-//   var appName = oProcess.displayedName()
-//   var unixId = oProcess.unixId()
+// as of 05/01/21 incognio & url are not actively used in AW
+// variables must be set to `undefined` since this script is re-run via osascript
+// and the previously set values will be cached otherwise
+var url = undefined,
+  incognito = undefined,
+  title = undefined
 
-//   // as of 05/01/21 incognio & url are not actively used in AW
-//   // variables must be set to `undefined` since this script is re-run via osascript
-//   // and the previously set values will be cached otherwise
-//   var url = undefined,
-//     incognito = undefined,
-//     title = undefined
+// it's not possible to get the URL from firefox
+// https://stackoverflow.com/questions/17846948/does-firefox-offer-applescript-support-to-get-url-of-windows
 
-//   // it's not possible to get the URL from firefox
-//   // https://stackoverflow.com/questions/17846948/does-firefox-offer-applescript-support-to-get-url-of-windows
+switch (appName) {
+  case "Safari":
+    // incognito is not available via safari applescript
+    url = Application(appName).documents[0].url()
+    title = Application(appName).documents[0].name()
+    break
+  case "Google Chrome":
+  case "Google Chrome Canary":
+  case "Chromium":
+  case "Brave Browser":
+    const activeWindow = Application(appName).windows[0]
+    const activeTab = activeWindow.activeTab()
 
-//   switch (appName) {
-//     case "Safari":
-//       // incognito is not available via safari applescript
-//       url = Application(appName).documents[0].url()
-//       title = Application(appName).documents[0].name()
-//       break
-//     case "Google Chrome":
-//     case "Google Chrome Canary":
-//     case "Chromium":
-//     case "Brave Browser":
-//       const activeWindow = Application(appName).windows[0]
-//       const activeTab = activeWindow.activeTab()
+    url = activeTab.url()
+    title = activeTab.name()
+    incognito = activeWindow.mode() === "incognito"
+    break
+  case "Firefox":
+  case "Firefox Developer Edition":
+    title = Application(appName).windows[0].name()
+    break
+  default:
+    mainWindow = oProcess
+      .windows()
+      .find((w) => w.attributes.byName("AXMain").value() === true)
 
-//       url = activeTab.url()
-//       title = activeTab.name()
-//       incognito = activeWindow.mode() === "incognito"
-//       break
-//     case "Firefox":
-//     case "Firefox Developer Edition":
-//       title = Application(appName).windows[0].name()
-//       break
-//     default:
-//       mainWindow = oProcess
-//         .windows()
-//         .find((w) => w.attributes.byName("AXMain").value() === true)
+    // in some cases, the primary window of an application may not be found
+    // this occurs rarely and seems to be triggered by switching to a different application
+    if (mainWindow) {
+      title = mainWindow.attributes.byName("AXTitle").value()
+    }
+}
 
-//       // in some cases, the primary window of an application may not be found
-//       // this occurs rarely and seems to be triggered by switching to a different application
-//       if (mainWindow) {
-//         title = mainWindow.attributes.byName("AXTitle").value()
-//       }
-//   }
-
-//   // key names must match expected names in lib.py
-//   JSON.stringify({
-//     unixId,
-//     app: appName,
-//     url,
-//     title,
-//     incognito,
-//   })
-// }
+// key names must match expected names in lib.py
+return JSON.stringify({
+  app: appName,
+  url,
+  title,
+  incognito,
+})
