@@ -82,6 +82,7 @@ impl WindowManager for MacosManger {
                 let Some(app_info) = app_info.as_ref() else {
                     return Err(anyhow!("No app info was loaded"));
                 };
+                dbg!("App info: {:?}", app_info);
                 app_info.clone()
             }
         };
