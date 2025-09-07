@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{process::{Command, Stdio}, str::Lines, time::Duration};
 
 use anyhow::{Result, anyhow};
 use objc2::{AllocAnyThread, rc::Retained};
@@ -10,7 +10,7 @@ use sysinfo::{self};
 use tracing::debug;
 
 use super::ActiveWindowData;
-use crate::{WindowManager, simple_cache::CacheConfig};
+use crate::{WindowManager, config::WatcherConfig};
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -26,10 +26,11 @@ pub struct MacosManger {
     sysinfo: sysinfo::System,
     script: Retained<OSAScript>,
     idle_timeout: Duration,
+    on_main_thread: bool,
 }
 
 impl MacosManger {
-    pub fn new(idle_timeout: Duration, _cache_config: Option<CacheConfig>) -> Result<Self> {
+    pub fn new(config: WatcherConfig) -> Result<Self> {
         // Prepare OSAScript with JavaScript (JXA)
         let script = OSAScript::alloc();
         let language = unsafe { OSALanguage::languageForName(&NSString::from_str("JavaScript")) }
@@ -52,7 +53,8 @@ impl MacosManger {
         Ok(Self {
             sysinfo: sysinfo::System::new_all(),
             script,
-            idle_timeout,
+            idle_timeout: config.idle_timeout,
+            on_main_thread: config.am_on_main_thread,
         })
     }
 }
@@ -108,3 +110,28 @@ impl WindowManager for MacosManger {
         Ok(last_input > self.idle_timeout.as_secs_f64())
     }
 }
+
+enum MacosRunner {
+    SeparateProcess {
+        command: Command,
+        // stdout: Lines<BufReader<Stdio>>,
+    },
+    OnMainThread {
+        script: Retained<OSAScript>,
+    },
+}
+
+fn create_osascript_command(duration: Duration) {
+
+}
+
+// fn create_separate_process() -> Result<MacosRunner> {
+//     let command = Command::new("osascript")
+//         .stdout(Stdio::piped())
+//         .arg("-e")
+//         .arg(COMMAND)
+//         .arg("-l")
+//         .arg("JavaScript")
+//         .spawn()
+//         .unwrap();
+// }

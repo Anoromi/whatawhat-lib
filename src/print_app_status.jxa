@@ -24,11 +24,11 @@ var oProcess = seApp.processes.whose({ frontmost: true })
 //   hello: Date.now().toString()
 // })
 // var oProcess = seApp.processes.whose({ frontmost: true })
-JSON.stringify({
-  length: oProcess.length,
-  name: oProcess.name(),
-  id: oProcess.id(),
-})
+// JSON.stringify({
+//   length: oProcess.length,
+//   name: oProcess.name(),
+//   id: oProcess.id(),
+// })
 // console.log(oProcess)
 // if (!oProcess) {
 //   JSON.stringify(null)

@@ -29,6 +29,7 @@ pub mod linux_desktop;
 pub mod simple_cache;
 pub mod utils;
 pub mod gnome_install;
+pub mod config;
 
 use std::{sync::Arc, time::Duration};
 
@@ -41,7 +42,7 @@ use anyhow::Result;
 ))]
 use tracing::info;
 
-use crate::simple_cache::CacheConfig;
+use crate::{config::WatcherConfig, simple_cache::CacheConfig};
 
 #[derive(Debug, Clone)]
 pub struct ActiveWindowData {
@@ -72,18 +73,18 @@ pub struct GenericWindowManager {
 }
 
 impl GenericWindowManager {
-    pub fn new(idle_timeout: Duration, cache_config: Option<CacheConfig>) -> Result<Self> {
+    pub fn new(config: WatcherConfig) -> Result<Self> {
         #[cfg(feature = "win")]
         {
             use win::WindowsWindowManager;
             return Ok(Self {
-                inner: Box::new(WindowsWindowManager::new(idle_timeout, cache_config)),
+                inner: Box::new(WindowsWindowManager::new(config)),
             });
         }
         #[cfg(feature = "gnome")]
         {
             use gnome::GnomeWindowWatcher;
-            let watcher = GnomeWindowWatcher::new(idle_timeout.into());
+            let watcher = GnomeWindowWatcher::new(config);
             match watcher {
                 Ok(watcher) => {
                     let result = Ok(Self {
@@ -101,7 +102,7 @@ impl GenericWindowManager {
         #[cfg(feature = "kde")]
         {
             use kde::KdeWindowManager;
-            let watcher = KdeWindowManager::new(idle_timeout);
+            let watcher = KdeWindowManager::new(config);
             match watcher {
                 Ok(watcher) => {
                     let result = Ok(Self {
@@ -119,7 +120,7 @@ impl GenericWindowManager {
         #[cfg(feature = "wayland")]
         {
             use wayland_wlr::WaylandWindowWatcher;
-            let watcher = WaylandWindowWatcher::new(idle_timeout, cache_config);
+            let watcher = WaylandWindowWatcher::new(config);
             match watcher {
                 Ok(watcher) => {
                     let result = Ok(Self {
@@ -137,7 +138,7 @@ impl GenericWindowManager {
         #[cfg(feature = "x11")]
         {
             use x11::LinuxWindowManager;
-            let watcher = LinuxWindowManager::new(idle_timeout);
+            let watcher = LinuxWindowManager::new(config);
             match watcher {
                 Ok(watcher) => {
                     let result = Ok(Self {
@@ -156,7 +157,7 @@ impl GenericWindowManager {
         {
             use macos::MacosManger;
             return Ok(Self {
-                inner: Box::new(MacosManger::new(idle_timeout, cache_config)?),
+                inner: Box::new(MacosManger::new(config)?),
             });
         }
         #[allow(unreachable_code)]
