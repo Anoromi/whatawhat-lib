@@ -10,7 +10,7 @@
 
 // null.hello();
 // console.log(Date.now())
-const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+var wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
 var seApp = Application("System Events")
 while (true) {
