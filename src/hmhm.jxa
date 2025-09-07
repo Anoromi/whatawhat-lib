@@ -15,13 +15,13 @@ var seApp = Application("System Events")
 function hmhm() {
   while (true) {
     var oProcess = seApp.processes.whose({ frontmost: true })
-    // console.log(
-    //   JSON.stringify({
-    //     length: oProcess.length,
-    //     name: oProcess.name(),
-    //     id: oProcess.id(),
-    //   })
-    // )
+    console.log(
+      JSON.stringify({
+        length: oProcess.length,
+        name: oProcess.name(),
+        id: oProcess.id(),
+      })
+    )
     delay(1)
   }
 }
