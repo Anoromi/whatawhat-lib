@@ -163,7 +163,7 @@ fn create_separate_osascript_process(collection_interval: Duration) -> Result<Ma
     )]
     let mut process = Command::new("osascript")
         .stdout(Stdio::piped())
-        .stderr(Stdio::null())
+        .stderr(Stdio::piped())
         .arg("-l")
         .arg("JavaScript")
         .arg("-e")
@@ -171,7 +171,7 @@ fn create_separate_osascript_process(collection_interval: Duration) -> Result<Ma
         .spawn()
         .unwrap();
 
-    let stdout = process.stdout.take().expect("Stdout was not piped");
+    let stdout = process.stderr.take().expect("Stdout was not piped");
     let (stop_signal, stop_signal_receiver) = std::sync::mpsc::channel();
     let handle = thread::spawn(move || {
         let lines = BufReader::new(stdout).lines();
