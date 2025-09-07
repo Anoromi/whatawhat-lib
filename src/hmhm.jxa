@@ -1,0 +1,23 @@
+#!/usr/bin/osascript -l JavaScript
+
+// adapted from:
+// https://gist.github.com/EvanLovely/cb01eafb0d61515c835ecd56f6ac199a
+
+// new to jxa?
+// - https://apple-dev.groups.io/g/jxa/wiki/3202
+// - interactive repl: `osascript -il JavaScript`
+// - API reference: Script Editor -> File -> Open Dictionary
+
+// null.hello();
+// console.log(Date.now())
+var seApp = Application("System Events")
+for (let v of seApp.processes) {
+  var oProcess = seApp.processes.whose({ frontmost: true })
+  console.log(
+    JSON.stringify({
+      length: oProcess.length,
+      name: oProcess.name(),
+      id: oProcess.id(),
+    })
+  )
+}
