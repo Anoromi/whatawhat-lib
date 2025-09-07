@@ -210,8 +210,7 @@ impl Drop for MacosRunner {
 
 fn create_osascript_command(collection_interval: Duration) -> String {
     format!(
-        r#"
-#!/usr/bin/osascript -l JavaScript
+        r#"#!/usr/bin/osascript -l JavaScript
 
 // adapted from:
 // https://gist.github.com/EvanLovely/cb01eafb0d61515c835ecd56f6ac199a
