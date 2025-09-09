@@ -14,14 +14,13 @@ use crate::{
 };
 
 pub struct GnomeWindowWatcher {
-    dbus_connection: Connection,
-    last_title: String,
-    last_app_id: String,
-    app_name: String,
-    process_path: String,
-    idle_timeout: Duration,
-    desktop_info_cache: SimpleCache<String, DesktopInfo>,
-    linux_desktop_info: LinuxDesktopInfo,
+    pub dbus_connection: Connection,
+    pub last_title: String,
+    pub last_app_id: String,
+    pub idle_timeout: Duration,
+    pub desktop_info_cache: SimpleCache<String, DesktopInfo>,
+    pub linux_desktop_info: LinuxDesktopInfo,
+    pub gnome_dbus_config: crate::config::GnomeDbusConfig,
 }
 
 #[derive(Deserialize, Default)]
@@ -33,10 +32,10 @@ struct WindowData {
 impl GnomeWindowWatcher {
     fn get_window_data(&self) -> anyhow::Result<WindowData> {
         let call_response = self.dbus_connection.call_method(
-            Some("org.gnome.Shell"),
-            "/org/gnome/shell/extensions/WhatawhatFocusedWindow",
-            Some("org.gnome.shell.extensions.WhatawhatFocusedWindow"),
-            "Get",
+            Some(self.gnome_dbus_config.window_service.as_str()),
+            self.gnome_dbus_config.window_path.as_str(),
+            Some(self.gnome_dbus_config.window_interface.as_str()),
+            self.gnome_dbus_config.window_method.as_str(),
             &(),
         );
 
@@ -63,10 +62,10 @@ impl GnomeWindowWatcher {
 
     fn get_idle_time_data(&self) -> Result<u64> {
         let call_response = self.dbus_connection.call_method(
-            Some("org.gnome.Shell"),
-            "/org/gnome/Mutter/IdleMonitor/Core",
-            Some("org.gnome.Mutter.IdleMonitor"),
-            "GetIdletime",
+            Some(self.gnome_dbus_config.idle_service.as_str()),
+            self.gnome_dbus_config.idle_path.as_str(),
+            Some(self.gnome_dbus_config.idle_interface.as_str()),
+            self.gnome_dbus_config.idle_method.as_str(),
             &(),
         );
         let result = call_response
@@ -86,10 +85,9 @@ impl GnomeWindowWatcher {
                 last_app_id: String::new(),
                 last_title: String::new(),
                 idle_timeout: config.idle_timeout,
-                app_name: String::new(),
-                process_path: String::new(),
                 desktop_info_cache: SimpleCache::new(config.cache_config.clone()),
                 linux_desktop_info: LinuxDesktopInfo::new(),
+                gnome_dbus_config: config.gnome_dbus_config.clone(),
             };
             watcher.get_window_data()?;
             Ok(watcher)

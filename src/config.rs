@@ -9,6 +9,41 @@ const DEFAULT_CACHE_CONFIG: CacheConfig = CacheConfig {
     max_size: 100,
 };
 
+#[derive(Clone)]
+pub struct GnomeDbusConfig {
+    /// The DBus service name for window data calls
+    pub window_service: String,
+    /// The DBus path for window data calls
+    pub window_path: String,
+    /// The DBus interface for window data calls
+    pub window_interface: String,
+    /// The DBus method name for window data calls
+    pub window_method: String,
+    /// The DBus service name for idle time calls
+    pub idle_service: String,
+    /// The DBus path for idle time calls
+    pub idle_path: String,
+    /// The DBus interface for idle time calls
+    pub idle_interface: String,
+    /// The DBus method name for idle time calls
+    pub idle_method: String,
+}
+
+impl Default for GnomeDbusConfig {
+    fn default() -> Self {
+        Self {
+            window_service: "org.gnome.Shell".to_string(),
+            window_path: "/org/gnome/shell/extensions/WhatawhatFocusedWindow".to_string(),
+            window_interface: "org.gnome.shell.extensions.WhatawhatFocusedWindow".to_string(),
+            window_method: "Get".to_string(),
+            idle_service: "org.gnome.Shell".to_string(),
+            idle_path: "/org/gnome/Mutter/IdleMonitor/Core".to_string(),
+            idle_interface: "org.gnome.Mutter.IdleMonitor".to_string(),
+            idle_method: "GetIdletime".to_string(),
+        }
+    }
+}
+
 #[derive(Clone, Default, Builder)]
 pub struct WatcherConfig {
     /// The timeout for the idle watcher.
@@ -24,4 +59,7 @@ pub struct WatcherConfig {
     /// The interval for the idle watcher.
     #[builder(default = Duration::from_secs(1))]
     pub idle_check_interval: Duration,
+    /// Configuration for GNOME DBus calls
+    #[builder(default)]
+    pub gnome_dbus_config: GnomeDbusConfig,
 }
