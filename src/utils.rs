@@ -1,9 +1,12 @@
 use std::{env, time::Duration};
 
+use tracing::info;
+
 use crate::simple_cache::CacheConfig;
 
 pub fn is_gnome() -> bool {
     if let Ok(de) = std::env::var("XDG_CURRENT_DESKTOP") {
+        info!("De", de);
         de.to_lowercase().contains("gnome")
     } else {
         false
