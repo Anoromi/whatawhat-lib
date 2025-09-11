@@ -167,7 +167,7 @@ impl WaylandWindowWatcherInner {
             ))?;
 
         let (process_path, app_name) = match self.desktop_info_cache.get(&active_window.app_id) {
-            Some(extra_info) => (Some(extra_info.process_path), Some(extra_info.app_name)),
+            Some(extra_info) => (extra_info.process_path, extra_info.app_name),
             None => {
                 if let Some(extra_info) = self
                     .linux_desktop_info
@@ -175,7 +175,7 @@ impl WaylandWindowWatcherInner {
                 {
                     self.desktop_info_cache
                         .set(active_window_id.clone(), extra_info.clone());
-                    (Some(extra_info.process_path), Some(extra_info.app_name))
+                    (extra_info.process_path, extra_info.app_name)
                 } else {
                     (None, None)
                 }

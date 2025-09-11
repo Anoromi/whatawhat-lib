@@ -9,8 +9,8 @@ pub struct LinuxDesktopInfo {
 
 #[derive(Clone)]
 pub struct DesktopInfo {
-    pub app_name: Arc<str>,
-    pub process_path: Arc<str>,
+    pub app_name: Option<Arc<str>>,
+    pub process_path: Option<Arc<str>>,
 }
 
 impl LinuxDesktopInfo {
@@ -35,8 +35,22 @@ impl LinuxDesktopInfo {
             }
         };
         Some(DesktopInfo {
-            app_name: entry.name(&["en_US".to_string()]).unwrap().into(),
-            process_path: exec_params.into_iter().next()?.into(),
+            app_name: entry.name(&["en_US".to_string()]).map(|n| n.into()),
+            process_path: process_command(exec_params).map(|p| p.into()),
         })
     }
+}
+
+fn process_command(params: Vec<String>) -> Option<String> {
+    for next in params.into_iter() {
+        if next == "env" {
+            continue;
+        }
+        // TODO improve how the command is processed
+        if next.contains('=') {
+            continue;
+        }
+        return Some(next);
+    }
+    return None;
 }
