@@ -26,7 +26,6 @@ impl LinuxDesktopInfo {
         }
         let hm = Ascii::new(app_id);
         let entry = freedesktop_desktop_entry::find_app_by_id(&self.entries, hm)?;
-        dbg!(&entry);
         let exec_params = match entry.parse_exec() {
             Ok(params) => params,
             Err(e) => {
