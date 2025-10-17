@@ -1,7 +1,7 @@
 use std::{
     io::{BufRead as _, BufReader},
-    process::{Child, Command, Stdio},
-    sync::{Arc, Mutex},
+    process::{Child, ChildStderr, Command, Stdio},
+    sync::{Arc, Mutex, mpsc::Sender},
     thread,
     time::Duration,
 };
@@ -121,7 +121,7 @@ impl WindowManager for MacosManger {
 enum MacosRunner {
     SeparateProcess {
         process: Child,
-        _handle: thread::JoinHandle<Result<()>>,
+        _handle: thread::JoinHandle<()>,
         stop_signal: std::sync::mpsc::Sender<()>,
         current_app_info: Arc<Mutex<Option<AppInfo>>>,
     },
@@ -173,25 +173,74 @@ fn create_separate_osascript_process(collection_interval: Duration) -> Result<Ma
 
     let stdout = process.stderr.take().expect("Stdout was not piped");
     let (stop_signal, stop_signal_receiver) = std::sync::mpsc::channel();
+    let (error_sender, error_receiver) = std::sync::mpsc::channel();
     let handle = thread::spawn(move || {
-        let lines = BufReader::new(stdout).lines();
-        for line in lines {
-            if stop_signal_receiver.try_recv().is_ok() {
-                return Ok(());
-            }
-            let line = line.unwrap();
-            let app_info: AppInfo = serde_json::from_str(&line).unwrap();
-            let mut current_app_info = inner_current_app_info.lock().unwrap();
-            *current_app_info = Some(app_info);
+        if let Err(e) = collect_app_info(inner_current_app_info, stdout) {
+            error_sender.send(Err(e)).unwrap();
+        } else {
+            error_sender.send(Ok(())).unwrap();
         }
-        Ok(())
     });
+    match error_receiver.recv() {
+        Ok(Ok(())) => (),
+        Ok(Err(e)) => return Err(anyhow!("Error collecting app info: {e}")),
+        Err(e) => return Err(anyhow!("Error receiving error: {e}")),
+    }
+    // let handle = thread::spawn(move || {
+    //     let lines = BufReader::new(stdout).lines();
+    //     for line in lines {
+    //         if stop_signal_receiver.try_recv().is_ok() {
+    //             return Ok(());
+    //         }
+    //         let line = line.unwrap();
+    //         let app_info: AppInfo = serde_json::from_str(&line)
+    //             .map_err(|e| anyhow!("Failed to parse JSON: {e}; line: {line}"))?;
+    //         let mut current_app_info = inner_current_app_info.lock().unwrap();
+    //         *current_app_info = Some(app_info);
+    //     }
+    //     Ok(())
+    // });
     Ok(MacosRunner::SeparateProcess {
         process,
         _handle: handle,
         stop_signal,
         current_app_info,
     })
+}
+
+fn collect_app_info(info_mutex: Arc<Mutex<Option<AppInfo>>>, stdout: ChildStderr) -> Result<()> {
+    let mut lines = BufReader::new(stdout).lines();
+    let Some(first_line) = lines.next() else {
+        return Ok(());
+    };
+    let line = first_line.unwrap();
+    let app_info: AppInfo = serde_json::from_str(&line).map_err(|e| {
+        anyhow!("Failed to parse JSON: {e}; line: {line}")
+            .context(MacosPermissionsDenied(e.to_string()))
+    })?;
+    let mut current_app_info = info_mutex.lock().unwrap();
+    *current_app_info = Some(app_info);
+
+    for line in lines {
+        let line = line.unwrap();
+        let app_info: AppInfo = serde_json::from_str(&line)
+            .map_err(|e| anyhow!("Failed to parse JSON: {e}; line: {line}"))
+            .unwrap();
+        let mut current_app_info = info_mutex.lock().unwrap();
+        *current_app_info = Some(app_info);
+        // return Ok(app_info);
+    }
+    Ok(())
+    // Err(anyhow!("No app info was found"))
+}
+
+#[derive(Debug)]
+struct MacosPermissionsDenied(String);
+
+impl std::fmt::Display for MacosPermissionsDenied {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "MacosPermissionsDenied: {}", self.0)
+    }
 }
 
 impl Drop for MacosRunner {
