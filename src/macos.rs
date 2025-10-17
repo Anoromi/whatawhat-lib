@@ -1,7 +1,7 @@
 use std::{
     io::{BufRead as _, BufReader},
     process::{Child, ChildStderr, Command, Stdio},
-    sync::{Arc, Mutex, mpsc::Sender},
+    sync::{mpsc::{Receiver, Sender}, Arc, Mutex},
     thread,
     time::Duration,
 };
@@ -175,7 +175,7 @@ fn create_separate_osascript_process(collection_interval: Duration) -> Result<Ma
     let (stop_signal, stop_signal_receiver) = std::sync::mpsc::channel();
     let (error_sender, error_receiver) = std::sync::mpsc::channel();
     let handle = thread::spawn(move || {
-        if let Err(e) = collect_app_info(inner_current_app_info, stdout) {
+        if let Err(e) = collect_app_info(stop_signal_receiver, inner_current_app_info, stdout) {
             error_sender.send(Err(e)).unwrap();
         } else {
             error_sender.send(Ok(())).unwrap();
@@ -184,7 +184,7 @@ fn create_separate_osascript_process(collection_interval: Duration) -> Result<Ma
     match error_receiver.recv() {
         Ok(Ok(())) => (),
         Ok(Err(e)) => return Err(anyhow!("Error collecting app info: {e}")),
-        Err(e) => return Err(anyhow!("Error receiving error: {e}")),
+        Err(e) => return Err(anyhow!("Error receiving message from error_channel: {e}")),
     }
     // let handle = thread::spawn(move || {
     //     let lines = BufReader::new(stdout).lines();
@@ -208,7 +208,7 @@ fn create_separate_osascript_process(collection_interval: Duration) -> Result<Ma
     })
 }
 
-fn collect_app_info(info_mutex: Arc<Mutex<Option<AppInfo>>>, stdout: ChildStderr) -> Result<()> {
+fn collect_app_info(stop_signal_receiver: Receiver<()>, info_mutex: Arc<Mutex<Option<AppInfo>>>, stdout: ChildStderr) -> Result<()> {
     let mut lines = BufReader::new(stdout).lines();
     let Some(first_line) = lines.next() else {
         return Ok(());
@@ -222,16 +222,17 @@ fn collect_app_info(info_mutex: Arc<Mutex<Option<AppInfo>>>, stdout: ChildStderr
     *current_app_info = Some(app_info);
 
     for line in lines {
+        if stop_signal_receiver.try_recv().is_ok() {
+            break;
+        }
         let line = line.unwrap();
         let app_info: AppInfo = serde_json::from_str(&line)
             .map_err(|e| anyhow!("Failed to parse JSON: {e}; line: {line}"))
             .unwrap();
         let mut current_app_info = info_mutex.lock().unwrap();
         *current_app_info = Some(app_info);
-        // return Ok(app_info);
     }
     Ok(())
-    // Err(anyhow!("No app info was found"))
 }
 
 #[derive(Debug)]
