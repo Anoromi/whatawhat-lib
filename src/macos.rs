@@ -186,20 +186,6 @@ fn create_separate_osascript_process(collection_interval: Duration) -> Result<Ma
         Ok(Err(e)) => return Err(anyhow!("Error collecting app info: {e}")),
         Err(e) => return Err(anyhow!("Error receiving message from error_channel: {e}")),
     }
-    // let handle = thread::spawn(move || {
-    //     let lines = BufReader::new(stdout).lines();
-    //     for line in lines {
-    //         if stop_signal_receiver.try_recv().is_ok() {
-    //             return Ok(());
-    //         }
-    //         let line = line.unwrap();
-    //         let app_info: AppInfo = serde_json::from_str(&line)
-    //             .map_err(|e| anyhow!("Failed to parse JSON: {e}; line: {line}"))?;
-    //         let mut current_app_info = inner_current_app_info.lock().unwrap();
-    //         *current_app_info = Some(app_info);
-    //     }
-    //     Ok(())
-    // });
     Ok(MacosRunner::SeparateProcess {
         process,
         _handle: handle,
