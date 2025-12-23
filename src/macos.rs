@@ -83,7 +83,7 @@ impl WindowManager for MacosManger {
                 current_app_info, ..
             } => {
                 let app_info = current_app_info.lock().unwrap();
-                dbg!("hello hello App info: {:?}", app_info);
+                dbg!("hello hello App info: {:?}", &app_info);
                 let Some(app_info) = app_info.as_ref() else {
                     return Err(anyhow!("No app info was loaded"));
                 };
