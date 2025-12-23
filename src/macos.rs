@@ -40,6 +40,7 @@ impl MacosManger {
             create_on_main_thread_osascript_process()?
         } else {
             dbg!("Creating separate osascript process");
+            tracing::debug!("Creating separate osascript process");
             create_separate_osascript_process(config.idle_check_interval)?
         };
 
