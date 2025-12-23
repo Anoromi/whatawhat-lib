@@ -82,6 +82,7 @@ impl WindowManager for MacosManger {
             MacosRunner::SeparateProcess {
                 current_app_info, ..
             } => {
+                dbg!("trying to log");
                 let app_info = current_app_info.lock().unwrap();
                 dbg!("hello hello App info: {:?}", &app_info);
                 let Some(app_info) = app_info.as_ref() else {
