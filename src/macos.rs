@@ -212,8 +212,10 @@ fn collect_app_info(
     let app_info: AppInfo = serde_json::from_str(&line).map_err(|e| {
         anyhow!("Failed to parse JSON: {e}; line: {line}").context(MacosStartError(e.to_string()))
     })?;
-    let mut current_app_info = info_mutex.lock().unwrap();
-    *current_app_info = Some(app_info);
+    {
+        let mut current_app_info = info_mutex.lock().unwrap();
+        *current_app_info = Some(app_info);
+    }
 
     for line in lines {
         tracing::debug!("Collecting app info 1: {:?}", &line);
