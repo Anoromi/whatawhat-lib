@@ -214,9 +214,11 @@ fn collect_app_info(
     *current_app_info = Some(app_info);
 
     for line in lines {
+        tracing::debug!("Collecting app info 1: {:?}", &line);
         if stop_signal_receiver.try_recv().is_ok() {
             break;
         }
+        tracing::debug!("Collecting app info 2: {:?}", &line);
         let line = line.unwrap();
         match serde_json::from_str(&line) {
             Ok(app_info) => {
