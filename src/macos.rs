@@ -42,7 +42,6 @@ impl MacosManger {
         let runner = if config.am_on_main_thread {
             create_on_main_thread_osascript_process()?
         } else {
-            dbg!("Creating separate osascript process");
             tracing::debug!("Creating separate osascript process");
             create_separate_osascript_process(config.idle_check_interval)?
         };
@@ -65,7 +64,6 @@ impl WindowManager for MacosManger {
                 if let Some(err) = err {
                     return Err(anyhow!("execution error: {:?}", &err));
                 }
-                // dbg!("Script output: {:?}", &data);
                 let json = unsafe {
                     data.ok_or_else(|| anyhow!("No result from OSAScript execution"))?
                         .stringValue()
@@ -73,7 +71,6 @@ impl WindowManager for MacosManger {
                 .ok_or_else(|| anyhow!("Script did not return a string value"))?
                 .to_string();
 
-                // dbg!("Script output: {}", &json);
                 // Parse JXA output
                 let app_info: AppInfo = serde_json::from_str(&json)
                     .map_err(|e| anyhow!("Failed to parse JXA JSON: {e}; payload: {json}"))?;
@@ -82,13 +79,10 @@ impl WindowManager for MacosManger {
             MacosRunner::SeparateProcess {
                 current_app_info, ..
             } => {
-                dbg!("trying to log");
                 let app_info = current_app_info.lock().unwrap();
-                dbg!("hello hello App info: {:?}", &app_info);
                 let Some(app_info) = app_info.as_ref() else {
                     return Err(anyhow!("No app info was loaded"));
                 };
-                dbg!("App info: {:?}", app_info);
                 app_info.clone()
             }
         };
@@ -179,7 +173,6 @@ fn create_separate_osascript_process(collection_interval: Duration) -> Result<Ma
         .spawn()
         .unwrap();
 
-    dbg!("spawned process");
     let stdout = process.stderr.take().expect("Stdout was not piped");
     let (stop_signal, stop_signal_receiver) = std::sync::mpsc::channel();
     let handle = thread::spawn(move || {
@@ -189,7 +182,6 @@ fn create_separate_osascript_process(collection_interval: Duration) -> Result<Ma
             tracing::debug!("App info collected");
         }
     });
-    dbg!("created separate process");
     Ok(MacosRunner::SeparateProcess {
         process,
         _handle: handle,
@@ -208,7 +200,6 @@ fn collect_app_info(
         return Ok(());
     };
     let line = first_line.unwrap();
-    dbg!("first line", &line);
     let app_info: AppInfo = serde_json::from_str(&line).map_err(|e| {
         anyhow!("Failed to parse JSON: {e}; line: {line}").context(MacosStartError(e.to_string()))
     })?;
