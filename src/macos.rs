@@ -171,6 +171,7 @@ fn create_separate_osascript_process(collection_interval: Duration) -> Result<Ma
         .spawn()
         .unwrap();
 
+    dbg!("spawned process");
     let stdout = process.stderr.take().expect("Stdout was not piped");
     let (stop_signal, stop_signal_receiver) = std::sync::mpsc::channel();
     let (error_sender, error_receiver) = std::sync::mpsc::channel();
@@ -186,6 +187,7 @@ fn create_separate_osascript_process(collection_interval: Duration) -> Result<Ma
         Ok(Err(e)) => return Err(anyhow!("Error collecting app info: {e}")),
         Err(e) => return Err(anyhow!("Error receiving message from error_channel: {e}")),
     }
+    dbg!("created separate process");
     Ok(MacosRunner::SeparateProcess {
         process,
         _handle: handle,
