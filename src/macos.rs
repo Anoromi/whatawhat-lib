@@ -161,6 +161,8 @@ fn create_separate_osascript_process(collection_interval: Duration) -> Result<Ma
     let current_app_info = Arc::new(Mutex::new(None));
     let inner_current_app_info = current_app_info.clone();
 
+    let command = create_osascript_command(collection_interval);
+    tracing::debug!("Created osascript command: {}", command);
     #[allow(
         clippy::zombie_processes,
         reason = "Process is killed by the Drop impl"
