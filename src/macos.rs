@@ -1,7 +1,10 @@
 use std::{
     io::{BufRead as _, BufReader},
     process::{Child, ChildStderr, Command, Stdio},
-    sync::{mpsc::{Receiver, Sender}, Arc, Mutex},
+    sync::{
+        Arc, Mutex,
+        mpsc::{Receiver, Sender},
+    },
     thread,
     time::Duration,
 };
@@ -191,7 +194,11 @@ fn create_separate_osascript_process(collection_interval: Duration) -> Result<Ma
     })
 }
 
-fn collect_app_info(stop_signal_receiver: Receiver<()>, info_mutex: Arc<Mutex<Option<AppInfo>>>, stdout: ChildStderr) -> Result<()> {
+fn collect_app_info(
+    stop_signal_receiver: Receiver<()>,
+    info_mutex: Arc<Mutex<Option<AppInfo>>>,
+    stdout: ChildStderr,
+) -> Result<()> {
     let mut lines = BufReader::new(stdout).lines();
     let Some(first_line) = lines.next() else {
         return Ok(());
@@ -199,8 +206,7 @@ fn collect_app_info(stop_signal_receiver: Receiver<()>, info_mutex: Arc<Mutex<Op
     let line = first_line.unwrap();
     dbg!("first line", &line);
     let app_info: AppInfo = serde_json::from_str(&line).map_err(|e| {
-        anyhow!("Failed to parse JSON: {e}; line: {line}")
-            .context(MacosStartError(e.to_string()))
+        anyhow!("Failed to parse JSON: {e}; line: {line}").context(MacosStartError(e.to_string()))
     })?;
     let mut current_app_info = info_mutex.lock().unwrap();
     *current_app_info = Some(app_info);
@@ -210,12 +216,16 @@ fn collect_app_info(stop_signal_receiver: Receiver<()>, info_mutex: Arc<Mutex<Op
             break;
         }
         let line = line.unwrap();
-        let app_info: AppInfo = serde_json::from_str(&line)
-            .map_err(|e| anyhow!("Failed to parse JSON: {e}; line: {line}"))
-            .unwrap();
-        tracing::debug!("App info: {:?}", &app_info);
-        let mut current_app_info = info_mutex.lock().unwrap();
-        *current_app_info = Some(app_info);
+        match serde_json::from_str(&line) {
+            Ok(app_info) => {
+                tracing::debug!("App info: {:?}", &app_info);
+                let mut current_app_info = info_mutex.lock().unwrap();
+                *current_app_info = Some(app_info);
+            }
+            Err(e) => {
+                tracing::error!("Failed to parse JSON: {e}; line: {line}");
+            }
+        }
     }
     Ok(())
 }
