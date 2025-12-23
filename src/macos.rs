@@ -332,8 +332,8 @@ var seApp = Application("System Events")
 function runCollector() {{
   while (true) {{
     console.log(getApp())
-    console.log("delaying for 1 second")
     delay({})
+    console.log("delaying for 1 second")
   }}
 }}
 
