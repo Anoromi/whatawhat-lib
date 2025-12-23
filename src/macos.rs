@@ -339,7 +339,6 @@ function runCollector() {{
   while (true) {{
     console.log(getApp())
     delay({})
-    console.log("delaying for 1 second")
   }}
 }}
 
