@@ -175,19 +175,13 @@ fn create_separate_osascript_process(collection_interval: Duration) -> Result<Ma
     dbg!("spawned process");
     let stdout = process.stderr.take().expect("Stdout was not piped");
     let (stop_signal, stop_signal_receiver) = std::sync::mpsc::channel();
-    let (error_sender, error_receiver) = std::sync::mpsc::channel();
     let handle = thread::spawn(move || {
         if let Err(e) = collect_app_info(stop_signal_receiver, inner_current_app_info, stdout) {
-            error_sender.send(Err(e)).unwrap();
+            tracing::error!("Error collecting app info: {e}");
         } else {
-            error_sender.send(Ok(())).unwrap();
+            tracing::debug!("App info collected");
         }
     });
-    match error_receiver.recv() {
-        Ok(Ok(())) => (),
-        Ok(Err(e)) => return Err(anyhow!("Error collecting app info: {e}")),
-        Err(e) => return Err(anyhow!("Error receiving message from error_channel: {e}")),
-    }
     dbg!("created separate process");
     Ok(MacosRunner::SeparateProcess {
         process,
@@ -203,7 +197,7 @@ fn collect_app_info(stop_signal_receiver: Receiver<()>, info_mutex: Arc<Mutex<Op
         return Ok(());
     };
     let line = first_line.unwrap();
-    dbg!("first line: {line}");
+    dbg!("first line", &line);
     let app_info: AppInfo = serde_json::from_str(&line).map_err(|e| {
         anyhow!("Failed to parse JSON: {e}; line: {line}")
             .context(MacosPermissionsDenied(e.to_string()))
