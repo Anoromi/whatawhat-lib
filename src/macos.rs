@@ -203,6 +203,7 @@ fn collect_app_info(stop_signal_receiver: Receiver<()>, info_mutex: Arc<Mutex<Op
         return Ok(());
     };
     let line = first_line.unwrap();
+    dbg!("first line: {line}");
     let app_info: AppInfo = serde_json::from_str(&line).map_err(|e| {
         anyhow!("Failed to parse JSON: {e}; line: {line}")
             .context(MacosPermissionsDenied(e.to_string()))
