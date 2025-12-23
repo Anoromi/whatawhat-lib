@@ -200,7 +200,7 @@ fn collect_app_info(stop_signal_receiver: Receiver<()>, info_mutex: Arc<Mutex<Op
     dbg!("first line", &line);
     let app_info: AppInfo = serde_json::from_str(&line).map_err(|e| {
         anyhow!("Failed to parse JSON: {e}; line: {line}")
-            .context(MacosPermissionsDenied(e.to_string()))
+            .context(MacosStartError(e.to_string()))
     })?;
     let mut current_app_info = info_mutex.lock().unwrap();
     *current_app_info = Some(app_info);
@@ -213,6 +213,7 @@ fn collect_app_info(stop_signal_receiver: Receiver<()>, info_mutex: Arc<Mutex<Op
         let app_info: AppInfo = serde_json::from_str(&line)
             .map_err(|e| anyhow!("Failed to parse JSON: {e}; line: {line}"))
             .unwrap();
+        tracing::debug!("App info: {:?}", &app_info);
         let mut current_app_info = info_mutex.lock().unwrap();
         *current_app_info = Some(app_info);
     }
@@ -220,9 +221,9 @@ fn collect_app_info(stop_signal_receiver: Receiver<()>, info_mutex: Arc<Mutex<Op
 }
 
 #[derive(Debug)]
-struct MacosPermissionsDenied(String);
+struct MacosStartError(String);
 
-impl std::fmt::Display for MacosPermissionsDenied {
+impl std::fmt::Display for MacosStartError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "MacosPermissionsDenied: {}", self.0)
     }
