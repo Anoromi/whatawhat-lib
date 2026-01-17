@@ -1,4 +1,4 @@
-use anyhow::Context;
+use crate::{Error, Result};
 use wayland_client::{
     Connection, Dispatch, EventQueue, Proxy, QueueHandle,
     globals::{GlobalList, GlobalListContents, registry_queue_init},
@@ -42,9 +42,9 @@ where
         + Dispatch<wl_registry::WlRegistry, ()>
         + 'static,
 {
-    pub fn connect() -> anyhow::Result<Self> {
+    pub fn connect() -> Result<Self> {
         let connection = Connection::connect_to_env()
-            .with_context(|| "Unable to connect to Wayland compositor")?;
+            .map_err(|_| Error::wayland_connection_failed())?;
         let display = connection.display();
         let (globals, event_queue) = registry_queue_init::<T>(&connection)?;
 
@@ -59,7 +59,7 @@ where
         })
     }
 
-    pub fn get_foreign_toplevel_manager(&self) -> anyhow::Result<ZwlrForeignToplevelManagerV1>
+    pub fn get_foreign_toplevel_manager(&self) -> Result<ZwlrForeignToplevelManagerV1>
     where
         T: Dispatch<ZwlrForeignToplevelManagerV1, ()>,
     {
@@ -69,10 +69,10 @@ where
                 1..=ZwlrForeignToplevelManagerV1::interface().version,
                 (),
             )
-            .map_err(std::convert::Into::into)
+            .map_err(Error::from)
     }
 
-    pub fn get_kwin_idle(&self) -> anyhow::Result<OrgKdeKwinIdle>
+    pub fn get_kwin_idle(&self) -> Result<OrgKdeKwinIdle>
     where
         T: Dispatch<OrgKdeKwinIdle, ()>,
     {
@@ -82,10 +82,10 @@ where
                 1..=OrgKdeKwinIdle::interface().version,
                 (),
             )
-            .map_err(std::convert::Into::into)
+            .map_err(Error::from)
     }
 
-    pub fn get_ext_idle(&self) -> anyhow::Result<ExtIdleNotifierV1>
+    pub fn get_ext_idle(&self) -> Result<ExtIdleNotifierV1>
     where
         T: Dispatch<ExtIdleNotifierV1, ()>,
     {
@@ -95,10 +95,10 @@ where
                 1..=ExtIdleNotifierV1::interface().version,
                 (),
             )
-            .map_err(std::convert::Into::into)
+            .map_err(Error::from)
     }
 
-    pub fn get_ext_idle_notification(&self, timeout: u32) -> anyhow::Result<ExtIdleNotificationV1>
+    pub fn get_ext_idle_notification(&self, timeout: u32) -> Result<ExtIdleNotificationV1>
     where
         T: Dispatch<ExtIdleNotifierV1, ()>
             + Dispatch<WlSeat, ()>
@@ -112,7 +112,7 @@ where
         Ok(idle.get_idle_notification(timeout, &seat, &self.queue_handle, ()))
     }
 
-    pub fn get_kwin_idle_timeout(&self, timeout: u32) -> anyhow::Result<OrgKdeKwinIdleTimeout>
+    pub fn get_kwin_idle_timeout(&self, timeout: u32) -> Result<OrgKdeKwinIdleTimeout>
     where
         T: Dispatch<OrgKdeKwinIdle, ()>
             + Dispatch<OrgKdeKwinIdleTimeout, ()>

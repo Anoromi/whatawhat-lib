@@ -1,3 +1,4 @@
+use crate::Result;
 use chrono::{DateTime, TimeDelta, Utc};
 use std::cmp::max;
 use tracing::debug;
@@ -59,7 +60,7 @@ impl Tracker {
         &mut self,
         now: DateTime<Utc>,
         seconds_since_input: u32,
-    ) -> anyhow::Result<Status> {
+    ) -> Result<Status> {
         let time_since_input = TimeDelta::seconds(i64::from(seconds_since_input));
 
         self.last_input_time = now - time_since_input;
@@ -79,7 +80,7 @@ impl Tracker {
         Ok(self.get_status(now))
     }
 
-    pub fn get_reactive(&mut self, now: DateTime<Utc>) -> anyhow::Result<Status> {
+    pub fn get_reactive(&mut self, now: DateTime<Utc>) -> Result<Status> {
         if !self.is_idle {
             self.last_input_time = max(self.last_input_time, now - self.idle_timeout);
 

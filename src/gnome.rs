@@ -1,12 +1,11 @@
 use std::time::Duration;
 
-use anyhow::{Context, Result, anyhow};
 use serde::Deserialize;
 use tracing::{debug, trace};
 use zbus::blocking::Connection;
 
 use crate::{
-    ActiveWindowData, WindowManager,
+    ActiveWindowData, Error, Result, WindowManager,
     config::WatcherConfig,
     linux_desktop::{DesktopInfo, LinuxDesktopInfo},
     simple_cache::SimpleCache,
@@ -30,7 +29,7 @@ struct WindowData {
 }
 
 impl GnomeWindowWatcher {
-    fn get_window_data(&self) -> anyhow::Result<WindowData> {
+    fn get_window_data(&self) -> Result<WindowData> {
         let call_response = self.dbus_connection.call_method(
             Some(self.gnome_dbus_config.window_service.as_str()),
             self.gnome_dbus_config.window_path.as_str(),
@@ -44,9 +43,11 @@ impl GnomeWindowWatcher {
                 let json: String = json
                     .body()
                     .deserialize()
-                    .with_context(|| "DBus interface cannot be parsed as string")?;
-                serde_json::from_str(&json).with_context(|| {
-                    format!("DBus interface org.gnome.shell.extensions.FocusedWindow returned wrong JSON: {json}")
+                    .map_err(|_| Error::dbus_response_parse_failed("DBus interface cannot be parsed as string"))?;
+                serde_json::from_str(&json).map_err(|_| {
+                    Error::dbus_response_parse_failed(format!(
+                        "DBus interface org.gnome.shell.extensions.FocusedWindow returned wrong JSON: {json}"
+                    ))
                 })
             }
             Err(e) => {
@@ -69,10 +70,10 @@ impl GnomeWindowWatcher {
             &(),
         );
         let result = call_response
-            .with_context(|| "Failed to get idle time")?
+            .map_err(|e| Error::dbus_idle_time_failed(e.to_string()))?
             .body()
             .deserialize::<u64>()
-            .with_context(|| "Failed to deserialize idle time")?;
+            .map_err(|_| Error::idle_time_deserialization_failed())?;
         Ok(result)
     }
 }
@@ -94,21 +95,23 @@ impl GnomeWindowWatcher {
         };
 
         if is_x11() {
-            return Err(anyhow!("X11 should be tried instead"));
+            return Err(Error::should_use_x11());
         }
 
         if !is_gnome() {
-            return Err(anyhow!("The runtime doesn't seem to be Gnome"));
+            return Err(Error::not_gnome_runtime());
         }
 
         debug!("Gnome Wayland detected");
 
-        let mut watcher = Err(anyhow::anyhow!(""));
+        let mut watcher: Result<Self> = Err(Error::dbus_call_failed("failed to initialize GNOME watcher after retries"));
         for _ in 0..3 {
             watcher = loader();
             if let Err(e) = &watcher {
                 debug!("Failed to load Gnome Wayland watcher: {e}");
                 std::thread::sleep(std::time::Duration::from_secs(3));
+            } else {
+                break;
             }
         }
         watcher
@@ -121,7 +124,7 @@ impl WindowManager for GnomeWindowWatcher {
         if let Err(e) = data {
             if e.to_string().contains("Object does not exist at path") {
                 trace!("The extension seems to have stopped");
-                return Err(anyhow::anyhow!("The extension seems to have stopped"));
+                return Err(Error::gnome_extension_stopped());
             }
             return Err(e);
         }

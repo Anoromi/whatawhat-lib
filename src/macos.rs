@@ -9,7 +9,6 @@ use std::{
     time::Duration,
 };
 
-use anyhow::{Result, anyhow};
 use objc2::{AllocAnyThread, rc::Retained};
 use objc2_core_graphics::{CGEventSource, CGEventSourceStateID, CGEventType};
 use objc2_foundation::{NSString, ns_string};
@@ -18,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use sysinfo::{self};
 
 use super::ActiveWindowData;
-use crate::{WindowManager, config::WatcherConfig};
+use crate::{Error, Result, WindowManager, config::WatcherConfig};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -62,18 +61,18 @@ impl WindowManager for MacosManger {
                 let mut err: Option<_> = None;
                 let data = unsafe { script.executeAndReturnError(err.as_mut()) };
                 if let Some(err) = err {
-                    return Err(anyhow!("execution error: {:?}", &err));
+                    return Err(Error::osa_script_execution_failed(format!("{:?}", &err)));
                 }
                 let json = unsafe {
-                    data.ok_or_else(|| anyhow!("No result from OSAScript execution"))?
+                    data.ok_or_else(|| Error::osa_script_no_result())?
                         .stringValue()
                 }
-                .ok_or_else(|| anyhow!("Script did not return a string value"))?
+                .ok_or_else(|| Error::osa_script_not_string())?
                 .to_string();
 
                 // Parse JXA output
                 let app_info: AppInfo = serde_json::from_str(&json)
-                    .map_err(|e| anyhow!("Failed to parse JXA JSON: {e}; payload: {json}"))?;
+                    .map_err(|e| Error::jxa_json_parse_failed(e.to_string(), json.clone()))?;
                 app_info
             }
             MacosRunner::SeparateProcess {
@@ -81,7 +80,7 @@ impl WindowManager for MacosManger {
             } => {
                 let app_info = current_app_info.lock().unwrap();
                 let Some(app_info) = app_info.as_ref() else {
-                    return Err(anyhow!("No app info was loaded"));
+                    return Err(Error::no_app_info_loaded());
                 };
                 app_info.clone()
             }
@@ -134,7 +133,7 @@ fn create_on_main_thread_osascript_process() -> Result<MacosRunner> {
     // Prepare OSAScript with JavaScript (JXA)
     let script = OSAScript::alloc();
     let language = unsafe { OSALanguage::languageForName(&NSString::from_str("JavaScript")) }
-        .ok_or_else(|| anyhow!("Failed to get JavaScript OSALanguage"))?;
+        .ok_or_else(|| Error::osa_language_not_found())?;
     let script = unsafe {
         OSAScript::initWithSource_language(
             script,
@@ -147,7 +146,7 @@ fn create_on_main_thread_osascript_process() -> Result<MacosRunner> {
     let mut err: Option<_> = None;
     let _ = unsafe { script.compileAndReturnError(err.as_mut()) };
     if let Some(err) = err {
-        return Err(anyhow!("compile error: {:?}", &err));
+        return Err(Error::osa_script_compilation_failed(format!("{:?}", &err)));
     }
 
     Ok(MacosRunner::OnMainThread { script })
@@ -201,7 +200,7 @@ fn collect_app_info(
     };
     let line = first_line.unwrap();
     let app_info: AppInfo = serde_json::from_str(&line).map_err(|e| {
-        anyhow!("Failed to parse JSON: {e}; line: {line}").context(MacosStartError(e.to_string()))
+        Error::macos_startup_failed(format!("Failed to parse JSON: {e}; line: {line}"))
     })?;
     {
         let mut current_app_info = info_mutex.lock().unwrap();
@@ -227,15 +226,6 @@ fn collect_app_info(
         }
     }
     Ok(())
-}
-
-#[derive(Debug)]
-struct MacosStartError(String);
-
-impl std::fmt::Display for MacosStartError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "MacosPermissionsDenied: {}", self.0)
-    }
 }
 
 impl Drop for MacosRunner {

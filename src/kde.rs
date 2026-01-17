@@ -7,8 +7,7 @@ use crate::idle::Status;
 use crate::linux_desktop::{DesktopInfo, LinuxDesktopInfo};
 use crate::simple_cache::SimpleCache;
 use crate::wayland_idle::IdleWatcherRunner;
-use crate::{ActiveWindowData, WindowManager, config::WatcherConfig};
-use anyhow::{Context, Result, anyhow};
+use crate::{ActiveWindowData, Error, Result, WindowManager, config::WatcherConfig};
 use std::env::{self, temp_dir};
 use std::path::Path;
 use std::sync::Arc;
@@ -33,9 +32,10 @@ impl KWinScript {
         }
     }
 
-    fn load(&mut self) -> anyhow::Result<()> {
+    fn load(&mut self) -> Result<()> {
         let path = temp_dir().join("whatawhat-lib.js");
-        std::fs::write(&path, KWIN_SCRIPT).with_context(|| "Failed to create kwin script")?;
+        std::fs::write(&path, KWIN_SCRIPT)
+            .map_err(|e| Error::kwin_script_creation_failed(e.to_string()))?;
 
         let number = self.get_registered_number(&path)?;
         let result = self.start(number);
@@ -45,7 +45,7 @@ impl KWinScript {
         result
     }
 
-    fn is_loaded(&self) -> anyhow::Result<bool> {
+    fn is_loaded(&self) -> Result<bool> {
         self.dbus_connection
             .call_method(
                 Some("org.kde.KWin"),
@@ -56,13 +56,13 @@ impl KWinScript {
             )?
             .body()
             .deserialize()
-            .map_err(std::convert::Into::into)
+            .map_err(|e| Error::from(crate::ErrorKind::Zbus(e)))
     }
 
-    fn get_registered_number(&self, path: &Path) -> anyhow::Result<i32> {
+    fn get_registered_number(&self, path: &Path) -> Result<i32> {
         let temp_path = path
             .to_str()
-            .ok_or(anyhow!("Temporary file path is not valid"))?;
+            .ok_or_else(Error::invalid_temp_path)?;
 
         self.dbus_connection
             .call_method(
@@ -75,10 +75,10 @@ impl KWinScript {
             )?
             .body()
             .deserialize()
-            .map_err(std::convert::Into::into)
+            .map_err(|e| Error::from(crate::ErrorKind::Zbus(e)))
     }
 
-    fn unload(&self) -> anyhow::Result<bool> {
+    fn unload(&self) -> Result<bool> {
         self.dbus_connection
             .call_method(
                 Some("org.kde.KWin"),
@@ -89,10 +89,10 @@ impl KWinScript {
             )?
             .body()
             .deserialize()
-            .map_err(std::convert::Into::into)
+            .map_err(|e| Error::from(crate::ErrorKind::Zbus(e)))
     }
 
-    fn start(&self, script_number: i32) -> anyhow::Result<()> {
+    fn start(&self, script_number: i32) -> Result<()> {
         debug!("Starting KWin script {script_number}");
 
         let path = if self.get_major_version() < 6 {
@@ -108,7 +108,7 @@ impl KWinScript {
                 "run",
                 &(),
             )
-            .with_context(|| "Error on starting the script")?;
+            .map_err(|_| Error::kwin_script_start_failed())?;
         Ok(())
     }
 
@@ -125,13 +125,13 @@ impl KWinScript {
         }
     }
 
-    fn get_major_version_from_env() -> anyhow::Result<i8> {
+    fn get_major_version_from_env() -> Result<i8> {
         env::var("KDE_SESSION_VERSION")?
             .parse::<i8>()
-            .map_err(std::convert::Into::into)
+            .map_err(Error::from)
     }
 
-    fn get_major_version_from_dbus(&self) -> anyhow::Result<i8> {
+    fn get_major_version_from_dbus(&self) -> Result<i8> {
         let support_information: String = self
             .dbus_connection
             .call_method(
@@ -142,22 +142,23 @@ impl KWinScript {
                 &(),
             )?
             .body()
-            .deserialize()?;
+            .deserialize()
+            .map_err(|e| Error::from(crate::ErrorKind::Zbus(e)))?;
 
         // find a string like "KWin version: 5.27.8" and extract the version number from it:
         let version = support_information
             .lines()
             .find(|line| line.starts_with("KWin version: "))
-            .ok_or(anyhow!("KWin version not found"))?
+            .ok_or_else(Error::kwin_version_not_found)?
             .split_whitespace()
             .last()
-            .ok_or(anyhow!("KWin version is invalid"))?;
+            .ok_or_else(|| Error::kwin_version_invalid("version string is empty".to_string()))?;
 
         // Extract the major version number from the version number like "5.27.8":
         let major_version = version
             .split('.')
             .next()
-            .ok_or(anyhow!("KWin version is invalid: {version}"))?
+            .ok_or_else(|| Error::kwin_version_invalid(version.to_string()))?
             .parse::<i8>()?;
 
         debug!("KWin version from DBus: {version}, major version: {major_version}");
@@ -176,7 +177,7 @@ impl Drop for KWinScript {
 
 fn send_active_window(
     active_window: &Arc<Mutex<ActiveWindow>>,
-) -> anyhow::Result<ActiveWindowData> {
+) -> Result<ActiveWindowData> {
     let active_window = active_window.lock().expect("Mutex poisoned");
 
     Ok(ActiveWindowData {
@@ -245,7 +246,7 @@ pub struct KdeWindowManager {
 }
 
 impl KdeWindowManager {
-    pub fn new(config: WatcherConfig) -> anyhow::Result<Self> {
+    pub fn new(config: WatcherConfig) -> Result<Self> {
         let mut kwin_script = KWinScript::new(Connection::session()?);
         if kwin_script.is_loaded()? {
             debug!("KWin script is already loaded, unloading");
@@ -254,7 +255,7 @@ impl KdeWindowManager {
         if env::var("WAYLAND_DISPLAY").is_err()
             && env::var_os("XDG_SESSION_TYPE").unwrap_or("".into()) == "x11"
         {
-            return Err(anyhow!("X11 should be tried instead"));
+            return Err(Error::should_use_x11());
         }
 
         kwin_script.load().unwrap();
@@ -277,7 +278,7 @@ impl KdeWindowManager {
             .name("com.github.anoromi.whatawhat_lib")?
             .serve_at("/com/github/anoromi/whatawhat_lib", active_window_interface)?
             .build()
-            .map_err(|e| anyhow!("Failed to run a DBus interface: {e}"))?;
+            .map_err(|e| Error::dbus_interface_failed(e.to_string()))?;
 
         // Intentionally avoid initial monitor_activity() here to ensure we only process
         // events when the caller invokes methods (run-when-called semantics).

@@ -1,11 +1,10 @@
-//! Contains logic for extracting records through x11. The implementation uses xcb for communication
-//! with the server.
+//! Contains logic for extracting records through Windows APIs.
 
 use crate::{
+    Error, Result,
     config::WatcherConfig,
     windows_desktop::{WindowsAppInfo, WindowsDesktopInfo},
 };
-use anyhow::{Result, anyhow};
 use tracing::error;
 use windows::{
     Win32::{
@@ -74,7 +73,7 @@ fn get_active_windows_data(
         let window = unsafe { GetForegroundWindow() };
 
         if window.is_invalid() {
-            return Err(anyhow!("Failed to get foreground window"));
+            return Err(Error::foreground_window_not_found());
         }
 
         let mut id = 0u32;
@@ -95,11 +94,11 @@ fn get_active_windows_data(
                 )
             };
             if size == 0 {
-                return Err(anyhow!("Failed to get active window"));
+                return Err(Error::active_window_not_found("unknown error"));
             } else {
                 let data = String::from_utf16(&message_buffer[0..size as usize])
                     .expect("Failed to unwrap");
-                return Err(anyhow!("Failed to get active window {data}"));
+                return Err(Error::active_window_not_found(data));
             }
         }
         let process_handle =
@@ -144,7 +143,7 @@ pub fn get_idle_time() -> Result<u64> {
     let is_success = unsafe { GetLastInputInfo(&mut last) };
     if !is_success.as_bool() {
         error!("Failed to retrieve user idle time");
-        return Err(anyhow!("Failed to retrieve user idle time"));
+        return Err(Error::idle_time_retrieval_failed());
     }
 
     let tick_count = unsafe { GetTickCount64() };

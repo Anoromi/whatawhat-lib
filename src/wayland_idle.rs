@@ -1,7 +1,7 @@
 use crate::idle::{self, Status};
+use crate::{Error, Result};
 
 use super::wl_connection::{WlEventConnection, subscribe_state};
-use anyhow::Context as _;
 use chrono::{TimeDelta, Utc};
 use std::{
     sync::{Arc, Mutex, mpsc},
@@ -77,7 +77,7 @@ pub struct IdleWatcher {
 }
 
 impl IdleWatcher {
-    pub fn new(timeout: u32) -> anyhow::Result<Self> {
+    pub fn new(timeout: u32) -> Result<Self> {
         let mut connection: WlEventConnection<WatcherState> = WlEventConnection::connect()?;
         connection.get_ext_idle()?;
 
@@ -96,12 +96,12 @@ impl IdleWatcher {
         })
     }
 
-    pub fn run_iteration(&mut self) -> anyhow::Result<Status> {
+    pub fn run_iteration(&mut self) -> Result<Status> {
         self.connection
             .event_queue
             .roundtrip(&mut self.watcher_state)
-            .with_context(|| "Event queue is not processed")?;
-        Ok(self.watcher_state.idle_state.get_reactive(Utc::now())?)
+            .map_err(|e| Error::wayland_event_queue_failed(e.to_string()))?;
+        self.watcher_state.idle_state.get_reactive(Utc::now())
     }
 }
 
@@ -114,7 +114,7 @@ pub struct IdleWatcherRunner {
 const IDLE_CHECK_INTERVAL: Duration = Duration::from_secs(10);
 
 impl IdleWatcherRunner {
-    pub fn new(timeout: u32) -> anyhow::Result<Self> {
+    pub fn new(timeout: u32) -> Result<Self> {
         let mut idle_watcher = IdleWatcher::new(timeout)?;
         let (stop_signal, stop_signal_receiver) = mpsc::channel();
         let current_idle_status = Arc::new(Mutex::new(None));
