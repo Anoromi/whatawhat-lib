@@ -56,7 +56,7 @@ impl KWinScript {
             )?
             .body()
             .deserialize()
-            .map_err(|e| Error::from(crate::ErrorKind::Zbus(e)))
+            .map_err(Error::from)
     }
 
     fn get_registered_number(&self, path: &Path) -> Result<i32> {
@@ -75,7 +75,7 @@ impl KWinScript {
             )?
             .body()
             .deserialize()
-            .map_err(|e| Error::from(crate::ErrorKind::Zbus(e)))
+            .map_err(Error::from)
     }
 
     fn unload(&self) -> Result<bool> {
@@ -89,7 +89,7 @@ impl KWinScript {
             )?
             .body()
             .deserialize()
-            .map_err(|e| Error::from(crate::ErrorKind::Zbus(e)))
+            .map_err(Error::from)
     }
 
     fn start(&self, script_number: i32) -> Result<()> {
@@ -143,7 +143,7 @@ impl KWinScript {
             )?
             .body()
             .deserialize()
-            .map_err(|e| Error::from(crate::ErrorKind::Zbus(e)))?;
+            .map_err(Error::from)?;
 
         // find a string like "KWin version: 5.27.8" and extract the version number from it:
         let version = support_information
