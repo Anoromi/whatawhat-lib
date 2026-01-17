@@ -1,3 +1,4 @@
+pub mod error;
 #[cfg(feature = "gnome")]
 pub mod gnome;
 #[cfg(feature = "kde")]
@@ -33,7 +34,7 @@ pub mod config;
 
 use std::sync::Arc;
 
-use anyhow::Result;
+pub use error::{Error, ErrorKind, Result};
 #[cfg(any(
     feature = "x11",
     feature = "wayland",
@@ -162,7 +163,7 @@ impl GenericWindowManager {
         }
         #[allow(unreachable_code)]
         {
-            Err(anyhow::anyhow!("No window manager was selected"))
+            Err(Error::no_window_manager())
         }
     }
 }

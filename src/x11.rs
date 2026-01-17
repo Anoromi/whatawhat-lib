@@ -3,7 +3,6 @@
 
 use std::time::Duration;
 
-use anyhow::{Result, anyhow};
 use sysinfo::Pid;
 use tracing::{error, instrument};
 use xcb::{
@@ -12,7 +11,7 @@ use xcb::{
     x::{self, ATOM_ANY, Atom, Drawable, GetProperty, InternAtom, Window},
 };
 
-use super::{ActiveWindowData, WindowManager, config::WatcherConfig};
+use super::{ActiveWindowData, Error, Result, WindowManager, config::WatcherConfig};
 
 fn get_pid_atom(conn: &Connection) -> Result<Atom> {
     let reply = conn.wait_for_reply(conn.send_request(&InternAtom {
@@ -112,9 +111,9 @@ impl WindowData {
             get_active_window(&self.connection, &default_window, self.active_window_atom)?;
         let window_name = get_name(&self.connection, active_window, self.window_name_atom)?;
         let process = get_pid(&self.connection, active_window, self.pid_atom)?
-            .ok_or_else(|| anyhow!("Failed to get pid: pid is None"))?;
+            .ok_or_else(Error::process_id_not_found)?;
         let process_name = get_process_name(process)?
-            .ok_or_else(|| anyhow!("Failed to get process name: process name is None"))?;
+            .ok_or_else(Error::process_name_not_found)?;
 
         Ok(ActiveWindowData {
             window_title: window_name.into(),
@@ -142,9 +141,7 @@ impl LinuxWindowManager {
         let (connection, preferred_screen) = xcb::Connection::connect(None)
             .inspect_err(|e| error!("Failed creating connection {e:?}"))?;
         if preferred_screen < 0 {
-            return Err(anyhow!(
-                "Preferred screen is less than 0 {preferred_screen}"
-            ));
+            return Err(Error::x11_invalid_screen(preferred_screen));
         }
         let preferred_screen = preferred_screen as usize;
         let active_window_atom = get_active_window_atom(&connection)

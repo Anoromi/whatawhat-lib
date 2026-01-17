@@ -1,13 +1,13 @@
 use std::{path::Path, process::Command};
 
-use anyhow::{Context as _, Result};
+use crate::{Error, Result};
 
 pub fn install_gnome_extension(path: &Path) -> Result<()> {
     Command::new("gnome-extensions")
         .arg("install")
         .arg(path)
         .status()
-        .with_context(|| "Failed to install gnome extension")?;
+        .map_err(|_| Error::gnome_extension_install_failed())?;
 
     Ok(())
 }
@@ -19,7 +19,7 @@ pub fn activate_gnome_extension() -> Result<()> {
         .arg("enable")
         .arg(EXTENSION_UUID)
         .status()
-        .with_context(|| "Failed to activate gnome extension")?;
+        .map_err(|_| Error::gnome_extension_activate_failed())?;
 
     Ok(())
 }
