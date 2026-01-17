@@ -36,7 +36,7 @@ function getApp() {
     default:
       mainWindow = oProcess
         .windows()
-        .find((w) => w.attributes.byName("AXMain").value() === true)
+        .find((w) => w.attributes?.byName("AXMain").value() === true)
 
       // in some cases, the primary window of an application may not be found
       // this occurs rarely and seems to be triggered by switching to a different application

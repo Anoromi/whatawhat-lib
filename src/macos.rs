@@ -1,7 +1,10 @@
 use std::{
     io::{BufRead as _, BufReader},
-    process::{Child, Command, Stdio},
-    sync::{Arc, Mutex},
+    process::{Child, ChildStderr, Command, Stdio},
+    sync::{
+        Arc, Mutex,
+        mpsc::{Receiver, Sender},
+    },
     thread,
     time::Duration,
 };
@@ -39,7 +42,7 @@ impl MacosManger {
         let runner = if config.am_on_main_thread {
             create_on_main_thread_osascript_process()?
         } else {
-            dbg!("Creating separate osascript process");
+            tracing::debug!("Creating separate osascript process");
             create_separate_osascript_process(config.idle_check_interval)?
         };
 
@@ -61,7 +64,6 @@ impl WindowManager for MacosManger {
                 if let Some(err) = err {
                     return Err(anyhow!("execution error: {:?}", &err));
                 }
-                // dbg!("Script output: {:?}", &data);
                 let json = unsafe {
                     data.ok_or_else(|| anyhow!("No result from OSAScript execution"))?
                         .stringValue()
@@ -69,7 +71,6 @@ impl WindowManager for MacosManger {
                 .ok_or_else(|| anyhow!("Script did not return a string value"))?
                 .to_string();
 
-                // dbg!("Script output: {}", &json);
                 // Parse JXA output
                 let app_info: AppInfo = serde_json::from_str(&json)
                     .map_err(|e| anyhow!("Failed to parse JXA JSON: {e}; payload: {json}"))?;
@@ -82,7 +83,6 @@ impl WindowManager for MacosManger {
                 let Some(app_info) = app_info.as_ref() else {
                     return Err(anyhow!("No app info was loaded"));
                 };
-                dbg!("App info: {:?}", app_info);
                 app_info.clone()
             }
         };
@@ -121,7 +121,7 @@ impl WindowManager for MacosManger {
 enum MacosRunner {
     SeparateProcess {
         process: Child,
-        _handle: thread::JoinHandle<Result<()>>,
+        _handle: thread::JoinHandle<()>,
         stop_signal: std::sync::mpsc::Sender<()>,
         current_app_info: Arc<Mutex<Option<AppInfo>>>,
     },
@@ -157,6 +157,8 @@ fn create_separate_osascript_process(collection_interval: Duration) -> Result<Ma
     let current_app_info = Arc::new(Mutex::new(None));
     let inner_current_app_info = current_app_info.clone();
 
+    let command = create_osascript_command(collection_interval);
+    tracing::debug!("Created osascript command: {}", command);
     #[allow(
         clippy::zombie_processes,
         reason = "Process is killed by the Drop impl"
@@ -174,17 +176,11 @@ fn create_separate_osascript_process(collection_interval: Duration) -> Result<Ma
     let stdout = process.stderr.take().expect("Stdout was not piped");
     let (stop_signal, stop_signal_receiver) = std::sync::mpsc::channel();
     let handle = thread::spawn(move || {
-        let lines = BufReader::new(stdout).lines();
-        for line in lines {
-            if stop_signal_receiver.try_recv().is_ok() {
-                return Ok(());
-            }
-            let line = line.unwrap();
-            let app_info: AppInfo = serde_json::from_str(&line).unwrap();
-            let mut current_app_info = inner_current_app_info.lock().unwrap();
-            *current_app_info = Some(app_info);
+        if let Err(e) = collect_app_info(stop_signal_receiver, inner_current_app_info, stdout) {
+            tracing::error!("Error collecting app info: {e}");
+        } else {
+            tracing::debug!("App info collected");
         }
-        Ok(())
     });
     Ok(MacosRunner::SeparateProcess {
         process,
@@ -192,6 +188,54 @@ fn create_separate_osascript_process(collection_interval: Duration) -> Result<Ma
         stop_signal,
         current_app_info,
     })
+}
+
+fn collect_app_info(
+    stop_signal_receiver: Receiver<()>,
+    info_mutex: Arc<Mutex<Option<AppInfo>>>,
+    stdout: ChildStderr,
+) -> Result<()> {
+    let mut lines = BufReader::new(stdout).lines();
+    let Some(first_line) = lines.next() else {
+        return Ok(());
+    };
+    let line = first_line.unwrap();
+    let app_info: AppInfo = serde_json::from_str(&line).map_err(|e| {
+        anyhow!("Failed to parse JSON: {e}; line: {line}").context(MacosStartError(e.to_string()))
+    })?;
+    {
+        let mut current_app_info = info_mutex.lock().unwrap();
+        *current_app_info = Some(app_info);
+    }
+
+    for line in lines {
+        tracing::debug!("Collecting app info 1: {:?}", &line);
+        if stop_signal_receiver.try_recv().is_ok() {
+            break;
+        }
+        tracing::debug!("Collecting app info 2: {:?}", &line);
+        let line = line.unwrap();
+        match serde_json::from_str(&line) {
+            Ok(app_info) => {
+                tracing::debug!("App info: {:?}", &app_info);
+                let mut current_app_info = info_mutex.lock().unwrap();
+                *current_app_info = Some(app_info);
+            }
+            Err(e) => {
+                tracing::error!("Failed to parse JSON: {e}; line: {line}");
+            }
+        }
+    }
+    Ok(())
+}
+
+#[derive(Debug)]
+struct MacosStartError(String);
+
+impl std::fmt::Display for MacosStartError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "MacosPermissionsDenied: {}", self.0)
+    }
 }
 
 impl Drop for MacosRunner {
@@ -262,12 +306,12 @@ function getApp() {{
     default:
       mainWindow = oProcess
         .windows()
-        .find((w) => w.attributes.byName("AXMain").value() === true)
+        .find((w) => w.attributes?.byName("AXMain").value() === true)
 
       // in some cases, the primary window of an application may not be found
       // this occurs rarely and seems to be triggered by switching to a different application
       if (mainWindow) {{
-        title = mainWindow.attributes.byName("AXTitle").value()
+        title = mainWindow.attributes?.byName("AXTitle").value()
       }}
   }}
 
